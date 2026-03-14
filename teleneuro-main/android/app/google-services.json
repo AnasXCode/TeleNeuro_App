@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "94262807656",
+    "project_id": "telenuro",
+    "storage_bucket": "telenuro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:94262807656:android:3d765a185d6bfae7e33fdd",
+        "android_client_info": {
+          "package_name": "com.example.teleneuro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBL8LmdqlfNh04hFfvxTtxM1C2BTFGJTs8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
