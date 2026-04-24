@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // 1. Ye naya import hai
+import 'package:firebase_core/firebase_core.dart';
 import 'Splash/splash_screen.dart';
 
-void main() async { // 2. Yahan 'async' likha hai
-  WidgetsFlutterBinding.ensureInitialized(); // 3. Ye line App ko ready karti hai
-  await Firebase.initializeApp(); // 4. Ye line Firebase start karti hai
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
 
   runApp(const MyApp());
 }

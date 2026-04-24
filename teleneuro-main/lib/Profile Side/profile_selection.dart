@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-// Apne folder structure ke hisaab se imports check kar lein
+
 import '../Patient Side/Auth/patient_portal.dart';
 import '../Doctor Side/Auth/doctor_portal.dart';
 
@@ -14,11 +14,11 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true, // Gradient poori screen par dikhane ke liye
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false, // Ye line auto-back arrow ko bhi rokti hai
+        automaticallyImplyLeading: false,
         title: const Text(
           'Profile Selection',
           style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
@@ -32,9 +32,9 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF00695C), // Dark Teal
-              Color(0xFF00897B), // Lighter Teal
-              Color(0xFF80CBC4), // Soft Teal
+              Color(0xFF00695C),
+              Color(0xFF00897B),
+              Color(0xFF80CBC4),
             ],
           ),
         ),
@@ -95,7 +95,7 @@ class _ProfileSelectionScreenState extends State<ProfileSelectionScreen> {
 
                 const SizedBox(height: 50),
 
-                // --- Patient Card (Animated) ---
+
                 FadeInAnimation(
                   delay: 3,
                   child: ScaleButton(
