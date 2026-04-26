@@ -185,7 +185,18 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 final docs = snapshot.data!.docs;
                 if (docs.isEmpty) return const Center(child: Text("No specialists registered yet."));
 
-                final filteredDocs = docs.where((doc) {
+                // ✅ SORTING LOGIC: Highest Rating Doctors First
+                List<DocumentSnapshot> sortedDocs = List.from(docs);
+                sortedDocs.sort((a, b) {
+                  var dataA = a.data() as Map<String, dynamic>;
+                  var dataB = b.data() as Map<String, dynamic>;
+                  double ratingA = (dataA['rating'] ?? 0.0).toDouble();
+                  double ratingB = (dataB['rating'] ?? 0.0).toDouble();
+                  return ratingB.compareTo(ratingA); // Descending order
+                });
+
+                // ✅ FILTERING LOGIC (Applied on Sorted Docs)
+                final filteredDocs = sortedDocs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>?;
                   if (data == null) return false;
                   final name = (data['name'] ?? '').toString().toLowerCase();
@@ -206,7 +217,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     String name = (data?['name'] ?? 'Unknown Doctor').toString();
                     String speciality = (data?['speciality'] ?? 'General Physician').toString();
 
-                    // ✅ NEW LOGIC ADDED HERE
+                    // ✅ RATING DISPLAY LOGIC
                     int totalReviews = data?['totalReviews'] ?? 0;
                     String ratingDisplay = totalReviews == 0 ? "New" : (data?['rating'] ?? 0.0).toString();
 
@@ -231,7 +242,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   const Icon(Icons.star, color: Colors.amber, size: 14),
-                                  // ✅ RATING DISPLAY UPDATED
                                   Text(" $ratingDisplay", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextDark))
                                 ]
                             )

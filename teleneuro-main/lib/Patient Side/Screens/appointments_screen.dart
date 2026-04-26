@@ -163,7 +163,7 @@ class _CalendarPageState extends State<CalendarPage> {
             return data['patientDeleted'] != true;
           }).toList();
 
-          // ✅ SORTING LOGIC: Arrange appointments by status priority
+          // ✅ MULTI-LEVEL SORTING LOGIC: Priority + Latest First
           visibleDocs.sort((a, b) {
             var dataA = a.data() as Map<String, dynamic>;
             var dataB = b.data() as Map<String, dynamic>;
@@ -178,7 +178,23 @@ class _CalendarPageState extends State<CalendarPage> {
             int pA = getPriority(dataA['status'] ?? 'Pending');
             int pB = getPriority(dataB['status'] ?? 'Pending');
 
-            return pA.compareTo(pB);
+            if (pA != pB) {
+              // Priority mukhtalif hai toh priority ke hisab se sort karo
+              return pA.compareTo(pB);
+            } else {
+              // Priority same hai toh TIME check karo (Latest pehle)
+              Timestamp? timeA = dataA['completedAt'] ?? dataA['createdAt'];
+              Timestamp? timeB = dataB['completedAt'] ?? dataB['createdAt'];
+
+              if (timeA != null && timeB != null) {
+                return timeB.compareTo(timeA); // Descending order
+              } else if (timeA != null) {
+                return -1;
+              } else if (timeB != null) {
+                return 1;
+              }
+              return 0;
+            }
           });
 
           return ListView.builder(
