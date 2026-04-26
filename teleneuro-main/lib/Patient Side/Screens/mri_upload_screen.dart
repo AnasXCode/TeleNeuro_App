@@ -9,7 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart'; // YEH NAYA PACKAGE ADD HUA HAI
+import 'package:share_plus/share_plus.dart';
 
 // Theme Colors
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -30,7 +30,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
   bool _isAnalyzing = false;
   String? _resultStage;
   String? _confidenceScore;
-  String? _pdfFilePath; // YEH NAYA VARIABLE SHARE BUTTON KE LIYE HAI
+  String? _pdfFilePath;
 
   Interpreter? _interpreter;
   final List<String> _classes = [
@@ -52,6 +52,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       _interpreter = await Interpreter.fromAsset(
         'assets/models/vit_fyp_direct.tflite',
       );
+      print("✅ Model loaded successfully");
     } catch (e) {
       print("❌ Error loading model: $e");
     }
@@ -65,7 +66,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         _selectedMRI = File(image.path);
         _resultStage = null;
         _confidenceScore = null;
-        _pdfFilePath = null; // Naya image aane par purani file ka path hata dein
+        _pdfFilePath = null;
       });
     }
   }
@@ -85,24 +86,18 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       final imageBytes = await _selectedMRI!.readAsBytes();
       img.Image? originalImage = img.decodeImage(imageBytes);
 
-      if (originalImage == null) throw Exception("Image decode fail ho gayi");
+      if (originalImage == null) throw Exception("Image decoding failed");
 
-      img.Image resized256 = img.copyResize(
-        originalImage,
-        width: 256,
-        height: 256,
-      );
+      // Preprocessing exactly matching PyTorch Pipeline
+      img.Image resized256 = img.copyResize(originalImage, width: 256, height: 256);
       int offset = (256 - 192) ~/ 2;
-      img.Image cropped = img.copyCrop(
-        resized256,
-        x: offset,
-        y: offset,
-        width: 192,
-        height: 192,
-      );
-      img.grayscale(cropped);
-      img.Image finalImage = img.copyResize(cropped, width: 224, height: 224);
+      img.Image cropped = img.copyCrop(resized256, x: offset, y: offset, width: 192, height: 192);
 
+      // Safety update for newer image package versions
+      img.Image grayImage = img.grayscale(cropped);
+      img.Image finalImage = img.copyResize(grayImage, width: 224, height: 224);
+
+      // Input shape: [1, 3, 224, 224] (NCHW Format)
       var input = List.generate(
         1,
             (i) => List.generate(
@@ -117,15 +112,21 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       for (int y = 0; y < 224; y++) {
         for (int x = 0; x < 224; x++) {
           final pixel = finalImage.getPixel(x, y);
-          input[0][0][y][x] = ((pixel.r / 255.0) - mean[0]) / std[0];
-          input[0][1][y][x] = ((pixel.g / 255.0) - mean[1]) / std[1];
-          input[0][2][y][x] = ((pixel.b / 255.0) - mean[2]) / std[2];
+
+          num r = pixel.r;
+          num g = pixel.g;
+          num b = pixel.b;
+
+          input[0][0][y][x] = ((r / 255.0) - mean[0]) / std[0];
+          input[0][1][y][x] = ((g / 255.0) - mean[1]) / std[1];
+          input[0][2][y][x] = ((b / 255.0) - mean[2]) / std[2];
         }
       }
 
       var output = List.generate(1, (i) => List.filled(4, 0.0));
       _interpreter!.run(input, output);
 
+      // Softmax Calculation
       List<double> logits = output[0];
       double maxLogit = logits.reduce(max);
       double sumExp = 0.0;
@@ -138,7 +139,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       }
       probs = probs.map((e) => e / sumExp).toList();
 
-      print("🧠 AI MODEL RAW CALCULATION: $probs");
+      print("🧠 AI MODEL CONFIDENCE: $probs");
 
       int predictedIndex = 0;
       double maxProb = probs[0];
@@ -149,6 +150,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         }
       }
 
+      // Security check for non-MRI images or low confidence
       if (maxProb < 0.50) {
         setState(() {
           _isAnalyzing = false;
@@ -174,6 +176,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         _isAnalyzing = false;
       });
     } catch (e) {
+      print("Inference Error: $e");
       setState(() {
         _isAnalyzing = false;
         _resultStage = "Error processing scan";
@@ -207,7 +210,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       final imageBytes = await _selectedMRI!.readAsBytes();
       final pdfImage = pw.MemoryImage(imageBytes);
 
-      // ASAL DATA FETCHING FROM LOGIN SESSION
       final prefs = await SharedPreferences.getInstance();
       String patientName = prefs.getString('name') ?? "Name Not Provided";
       String patientEmail = prefs.getString('email') ?? "Email Not Provided";
@@ -223,7 +225,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
           margin: const pw.EdgeInsets.all(32),
           build: (pw.Context context) {
             return [
-              // --- Header ---
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
@@ -248,7 +249,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               pw.Divider(thickness: 2, color: PdfColors.blue900),
               pw.SizedBox(height: 15),
 
-              // --- Real Patient Information Table ---
               pw.Text("PATIENT DEMOGRAPHICS", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               pw.SizedBox(height: 8),
               pw.Table(
@@ -270,7 +270,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               ),
               pw.SizedBox(height: 25),
 
-              // --- AI Diagnosis Result ---
               pw.Container(
                 padding: const pw.EdgeInsets.all(15),
                 decoration: pw.BoxDecoration(
@@ -303,7 +302,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               ),
               pw.SizedBox(height: 20),
 
-              // --- Proper Clinical Paragraph ---
               pw.Text("CLINICAL NOTES & OBSERVATIONS", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
               pw.SizedBox(height: 8),
               pw.Paragraph(
@@ -313,7 +311,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               ),
               pw.SizedBox(height: 25),
 
-              // --- MRI Scan Image ---
               pw.Center(child: pw.Text("PROVIDED MRI SCAN (AXIAL VIEW)", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.blue800))),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -328,7 +325,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
 
               pw.SizedBox(height: 40),
 
-              // --- Footer & Disclaimer ---
               pw.Divider(color: PdfColors.grey400),
               pw.Text("Examining Physician's Remarks / Signature:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 40),
@@ -354,7 +350,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       savedReports.add(file.path);
       await prefs.setStringList('saved_reports', savedReports);
 
-      // 👇 YAHAN PATH SAVE KIYA JAA RAHA HAI SHARE BUTTON KE LIYE 👇
       setState(() {
         _pdfFilePath = file.path;
       });
@@ -573,7 +568,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
 
                   const SizedBox(height: 20),
 
-                  // PDF DOWNLOAD BUTTON
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -601,7 +595,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                     ),
                   ),
 
-                  // 👇 NAYA SHARE BUTTON 👇
                   if (_pdfFilePath != null) ...[
                     const SizedBox(height: 15),
                     SizedBox(
@@ -624,7 +617,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue, // Share button ka naya color
+                          backgroundColor: Colors.blue,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
