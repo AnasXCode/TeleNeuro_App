@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../Auth/doctor_login_page.dart';
 
 // --- DATA & WIDGET IMPORTS ---
-import '../Data/doctor_dummy_data.dart';
+// Hum ne yahan se doctor_dummy_data.dart nikal diya hai kyunke ab sab Real Hoga
 import '../Widgets/stat_card.dart';
 import '../Widgets/request_card.dart';
 
@@ -100,15 +100,17 @@ class DoctorHomeTab extends StatefulWidget {
 
 class _DoctorHomeTabState extends State<DoctorHomeTab> {
   String _doctorName = "Doctor";
-  final String _currentDoctorId = FirebaseAuth.instance.currentUser!.uid; // Store ID for filtering
+  String _doctorRating = "4.9"; // Fallback Real Rating
+  String _doctorExperience = "5+ Yrs"; // Fallback Real Experience
+  final String _currentDoctorId = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   void initState() {
     super.initState();
-    _fetchDoctorName();
+    _fetchDoctorData();
   }
 
-  Future<void> _fetchDoctorName() async {
+  Future<void> _fetchDoctorData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
@@ -118,12 +120,16 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
             .get();
 
         if (doc.exists) {
+          Map<String, dynamic>? data = doc.data() as Map<String, dynamic>?;
           setState(() {
-            _doctorName = doc['name'];
+            _doctorName = data?['name'] ?? 'Doctor';
+            // Agar profile mein rating/experience set hai toh wahan se warna default
+            if (data != null && data.containsKey('rating')) _doctorRating = data['rating'].toString();
+            if (data != null && data.containsKey('experience')) _doctorExperience = data['experience'].toString();
           });
         }
       } catch (e) {
-        print("Error fetching name: $e");
+        print("Error fetching doctor data: $e");
       }
     }
   }
@@ -173,40 +179,67 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
             ),
             const SizedBox(height: 15),
 
-            // Stats Grid
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-              childAspectRatio: 1.3,
-              children: [
-                StatCard(
-                  label: "Total Patients",
-                  value: dashboardStats['patients']!,
-                  icon: Icons.people,
-                  color: Colors.blue,
-                ),
-                StatCard(
-                  label: "Pending Requests",
-                  value: "New",
-                  icon: Icons.pending_actions,
-                  color: Colors.orange,
-                ),
-                StatCard(
-                  label: "Rating",
-                  value: dashboardStats['rating']!,
-                  icon: Icons.star,
-                  color: Colors.amber,
-                ),
-                StatCard(
-                  label: "Experience",
-                  value: dashboardStats['experience']!,
-                  icon: Icons.work,
-                  color: Colors.purple,
-                ),
-              ],
+            // DYNAMIC STATS GRID FROM FIREBASE
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('appointments')
+                  .where('doctorId', isEqualTo: _currentDoctorId)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                int pendingCount = 0;
+                Set<String> uniquePatients = {}; // Set duplicates allow nahi karta
+
+                if (snapshot.hasData) {
+                  for (var doc in snapshot.data!.docs) {
+                    var data = doc.data() as Map<String, dynamic>;
+                    String status = data['status'] ?? '';
+                    String patientId = data['patientId'] ?? '';
+
+                    if (status == 'Pending') {
+                      pendingCount++;
+                    } else if (status == 'Accepted' || status == 'Completed') {
+                      if (patientId.isNotEmpty) {
+                        uniquePatients.add(patientId);
+                      }
+                    }
+                  }
+                }
+
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 15,
+                  mainAxisSpacing: 15,
+                  childAspectRatio: 1.3,
+                  children: [
+                    StatCard(
+                      label: "Total Patients",
+                      value: uniquePatients.length.toString(), // Firebase se live count
+                      icon: Icons.people,
+                      color: Colors.blue,
+                    ),
+                    StatCard(
+                      label: "Pending Requests",
+                      value: pendingCount.toString(), // Firebase se live count
+                      icon: Icons.pending_actions,
+                      color: Colors.orange,
+                    ),
+                    StatCard(
+                      label: "Rating",
+                      value: _doctorRating, // Firestore User Profile se
+                      icon: Icons.star,
+                      color: Colors.amber,
+                    ),
+                    StatCard(
+                      label: "Experience",
+                      value: _doctorExperience, // Firestore User Profile se
+                      icon: Icons.work,
+                      color: Colors.purple,
+                    ),
+                  ],
+                );
+              },
             ),
 
             const SizedBox(height: 25),
@@ -226,12 +259,12 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
               ],
             ),
 
-            // REAL-TIME REQUESTS LIST (FILTERED)
+            // REAL-TIME REQUESTS LIST
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('appointments')
                   .where('status', isEqualTo: 'Pending')
-                  .where('doctorId', isEqualTo: _currentDoctorId) // ✅ ADDED FILTER
+                  .where('doctorId', isEqualTo: _currentDoctorId)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -266,13 +299,12 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                     var data = docs[index].data() as Map<String, dynamic>;
                     String docId = docs[index].id;
 
-                    // Data convert with safety
                     Map<String, String> requestData = {
                       'name': (data['patientName'] ?? 'Unknown').toString(),
-                      'issue': (data['problem'] ?? 'Consultation').toString(), // 'type' ko 'problem' se replace kiya kyunke humne database mein 'problem' save kiya tha
+                      'issue': (data['problem'] ?? 'Consultation').toString(),
                       'date': (data['date'] ?? '').toString(),
                       'time': (data['time'] ?? '').toString(),
-                      'image': 'assets/images/patient_placeholder.png', // Placeholder image use kar rahe hain crash se bachne ke liye
+                      'image': 'assets/images/patient_placeholder.png',
                     };
 
                     return RequestCard(

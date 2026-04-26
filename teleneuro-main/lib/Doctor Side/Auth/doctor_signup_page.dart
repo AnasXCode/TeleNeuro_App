@@ -75,12 +75,12 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
         'uid': userCredential.user!.uid,
         'name': name,
         'email': email,
-
-        // ✅ FIX 1: Capital 'D' zaroori hai (Patient app isay dhoond rahi hai)
         'role': 'Doctor',
-
-        // ✅ FIX 2: Default speciality add ki (Baad mein profile edit se change hogi)
         'speciality': 'General Physician',
+
+        // ✅ NEW LOGIC: Default rating for new doctors
+        'rating': 0.0,
+        'totalReviews': 0,
 
         'createdAt': FieldValue.serverTimestamp(),
       });

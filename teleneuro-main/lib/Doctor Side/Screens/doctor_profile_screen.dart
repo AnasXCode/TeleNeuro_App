@@ -1,13 +1,105 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ Added for Database
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import '../Auth/doctor_login_page.dart';
-import '../Data/doctor_dummy_data.dart';
 
-class DoctorProfileScreen extends StatelessWidget {
+class DoctorProfileScreen extends StatefulWidget {
   const DoctorProfileScreen({super.key});
 
-  // --- LOGOUT FUNCTION ---
+  @override
+  State<DoctorProfileScreen> createState() => _DoctorProfileScreenState();
+}
+
+class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
+  String _name = "Loading...";
+  String _email = "";
+  String _experience = "0 Years";
+  String _rating = "Loading..."; // Default
+  String _hospital = "Not Set";
+  String _phone = "Not Set";
+
+  final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDoctorData();
+  }
+
+  // --- FETCH DATA FROM FIRESTORE ---
+  Future<void> _fetchDoctorData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        setState(() {
+          _name = data['name'] ?? "Doctor";
+          _email = data['email'] ?? "";
+          _experience = data['experience'] ?? "0 Years";
+          _hospital = data['hospital'] ?? "Not Set";
+          _phone = data['phone'] ?? "Not Set";
+
+          // ✅ NEW RATING LOGIC
+          int totalReviews = data['totalReviews'] ?? 0;
+          if (totalReviews == 0) {
+            _rating = "New";
+          } else {
+            _rating = "${data['rating']?.toString() ?? "0.0"} / 5.0";
+          }
+        });
+      }
+    }
+  }
+
+  // --- UPDATE EXPERIENCE DIALOG ---
+  void _showEditExperienceDialog() {
+    String currentExp = _experience.replaceAll(RegExp(r'[^0-9]'), '');
+    TextEditingController expController = TextEditingController(text: currentExp);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Update Experience"),
+        content: TextField(
+          controller: expController,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          maxLength: 2,
+          decoration: const InputDecoration(
+            hintText: "e.g., 5",
+            labelText: "Years of Experience",
+            suffixText: "Years",
+            counterText: "",
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            onPressed: () async {
+              if (expController.text.isEmpty) return;
+
+              String newExp = "${expController.text} Years";
+
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(currentUserId)
+                  .update({'experience': newExp});
+
+              setState(() => _experience = newExp);
+              if (!mounted) return;
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Experience Updated Successfully")));
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- LOGOUT & DELETE ACCOUNT ---
   void _handleLogout(BuildContext context) {
     showDialog(
       context: context,
@@ -15,23 +107,13 @@ class DoctorProfileScreen extends StatelessWidget {
         title: const Text("Logout"),
         content: const Text("Are you sure you want to logout?"),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context), // Cancel
-            child: const Text("Cancel"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-
               if (!context.mounted) return;
-              Navigator.pop(context);
-
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const DoctorLoginScreen()),
-                    (route) => false,
-              );
+              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const DoctorLoginScreen()), (route) => false);
             },
             child: const Text("Logout", style: TextStyle(color: Colors.white)),
           ),
@@ -40,67 +122,24 @@ class DoctorProfileScreen extends StatelessWidget {
     );
   }
 
-  // --- DELETE ACCOUNT FUNCTION (New) ---
   void _handleDeleteAccount(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Delete Account?", style: TextStyle(color: Colors.red)),
-        content: const Text(
-            "Are you sure? This will permanently remove your profile from TeleNeuro. This action cannot be undone."),
+        content: const Text("This will permanently remove your profile. This action cannot be undone."),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              Navigator.pop(context); // Dialog band kiya
-
-              // Loading Dikhaya
-              showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (c) => const Center(child: CircularProgressIndicator()),
-              );
-
-              try {
-                User? user = FirebaseAuth.instance.currentUser;
-
-                if (user != null) {
-                  // 1. Database se uraya
-                  await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(user.uid)
-                      .delete();
-
-                  // 2. Authentication se uraya
-                  await user.delete();
-
-                  if (!context.mounted) return;
-                  Navigator.pop(context); // Loading hataya
-
-                  // 3. Login Screen par bhej diya
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const DoctorLoginScreen()),
-                        (route) => false,
-                  );
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Account Deleted Successfully")),
-                  );
-                }
-              } catch (e) {
-                Navigator.pop(context); // Loading hataya
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Error: $e. Please Login again.")),
-                );
-              }
+              User? user = FirebaseAuth.instance.currentUser;
+              await FirebaseFirestore.instance.collection('users').doc(user!.uid).delete();
+              await user.delete();
+              if (!context.mounted) return;
+              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const DoctorLoginScreen()), (route) => false);
             },
-            child: const Text("Delete Forever", style: TextStyle(color: Colors.white)),
+            child: const Text("Delete", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -111,83 +150,121 @@ class DoctorProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9FC),
-      appBar: AppBar(
-        title: const Text("My Profile"),
-        backgroundColor: const Color(0xFF1565C0),
-        elevation: 0,
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-      ),
+      appBar: AppBar(title: const Text("My Profile", style: TextStyle(color: Colors.white)), backgroundColor: const Color(0xFF1565C0), centerTitle: true, automaticallyImplyLeading: false),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, // Left align ke liye
           children: [
-            const CircleAvatar(
-              radius: 50,
-              backgroundColor: Color(0xFFE3F2FD),
-              child: Icon(Icons.person, size: 60, color: Color(0xFF1565C0)),
-            ),
-            const SizedBox(height: 15),
-
-            // Name
-            const Text(
-              "Dr. Anas Ahmed",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const Text(
-              "Neurologist • MBBS, FCPS",
-              style: TextStyle(color: Colors.grey),
+            Center(
+              child: Column(
+                children: [
+                  const CircleAvatar(radius: 50, backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.person, size: 60, color: Color(0xFF1565C0))),
+                  const SizedBox(height: 15),
+                  Text("Dr. $_name", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
             const SizedBox(height: 30),
 
-            // Info Tiles
-            _buildProfileTile(Icons.email, "Email", "doctor@telenuro.com"),
-            _buildProfileTile(Icons.phone, "Phone", "+92 300 1234567"),
-            _buildProfileTile(Icons.local_hospital, "Hospital", "Shifa International"),
-            // Null check lagaya hai taake error na aye agar data na ho
-            _buildProfileTile(Icons.star, "Rating",
-                "${dashboardStats['rating'] ?? '4.8'} (${dashboardStats['reviews'] ?? '120'})"),
+            _buildProfileTile(Icons.email, "Email", _email),
+            _buildProfileTile(Icons.phone, "Phone", _phone),
+            _buildProfileTile(Icons.local_hospital, "Hospital", _hospital),
+            _buildProfileTile(Icons.star, "Rating", _rating), // ✅ CHANGED: Ab direct _rating variable pass ho raha hai
+
+            Card(
+              margin: const EdgeInsets.only(bottom: 20),
+              child: ListTile(
+                leading: const Icon(Icons.work, color: Color(0xFF1565C0)),
+                title: const Text("Experience", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                subtitle: Text(_experience, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                  onPressed: _showEditExperienceDialog,
+                ),
+              ),
+            ),
+
+            // PATIENT REVIEWS SECTION
+            const Divider(thickness: 1.5),
+            const SizedBox(height: 10),
+            const Text(
+              "Patient Reviews",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF37474F)),
+            ),
+            const SizedBox(height: 15),
+
+            // Real-time StreamBuilder for Reviews
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('appointments')
+                  .where('doctorId', isEqualTo: currentUserId)
+                  .where('isRated', isEqualTo: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: Text("No reviews yet.", style: TextStyle(color: Colors.grey))),
+                  );
+                }
+
+                var reviews = snapshot.data!.docs;
+
+                return ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: reviews.length,
+                  itemBuilder: (context, index) {
+                    var data = reviews[index].data() as Map<String, dynamic>;
+                    double stars = (data['givenRating'] ?? 0).toDouble();
+                    String feedback = data['reviewText'] ?? "No comment provided.";
+                    String patientName = data['patientName'] ?? "Anonymous Patient";
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      color: Colors.white,
+                      elevation: 1,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(patientName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                Row(
+                                  children: [
+                                    Text(stars.toString(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              feedback.isEmpty ? "No comment provided." : '"$feedback"',
+                              style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.black87, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
 
             const SizedBox(height: 30),
 
-            // Logout Button
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: () {
-                  _handleLogout(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1565C0), // Blue for Logout
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text("Logout",
-                    style: TextStyle(color: Colors.white, fontSize: 16)),
-              ),
-            ),
-
+            // Buttons
+            SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => _handleLogout(context), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0)), child: const Text("Logout", style: TextStyle(color: Colors.white)))),
             const SizedBox(height: 15),
-
-            // ✅ DELETE ACCOUNT BUTTON (New)
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: OutlinedButton(
-                onPressed: () {
-                  _handleDeleteAccount(context);
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text("Delete Account",
-                    style: TextStyle(color: Colors.red, fontSize: 16)),
-              ),
-            ),
-            const SizedBox(height: 20),
+            SizedBox(width: double.infinity, height: 50, child: OutlinedButton(onPressed: () => _handleDeleteAccount(context), style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)), child: const Text("Delete Account", style: TextStyle(color: Colors.red)))),
           ],
         ),
       ),
@@ -199,11 +276,8 @@ class DoctorProfileScreen extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         leading: Icon(icon, color: const Color(0xFF1565C0)),
-        title: Text(title,
-            style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        subtitle: Text(value,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, color: Colors.black)),
+        title: Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        subtitle: Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
       ),
     );
   }
