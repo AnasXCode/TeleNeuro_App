@@ -82,6 +82,34 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       _pdfFilePath = null;
     });
 
+    // 1. SHOW WAITING DIALOG
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 10),
+            CircularProgressIndicator(color: kPrimaryColor),
+            SizedBox(height: 20),
+            Text(
+              "Please Wait...",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 5),
+            Text(
+              "AI is deeply analyzing the scan.",
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
     try {
       final imageBytes = await _selectedMRI!.readAsBytes();
       img.Image? originalImage = img.decodeImage(imageBytes);
@@ -93,11 +121,9 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       int offset = (256 - 192) ~/ 2;
       img.Image cropped = img.copyCrop(resized256, x: offset, y: offset, width: 192, height: 192);
 
-      // Safety update for newer image package versions
       img.Image grayImage = img.grayscale(cropped);
       img.Image finalImage = img.copyResize(grayImage, width: 224, height: 224);
 
-      // Input shape: [1, 3, 224, 224] (NCHW Format)
       var input = List.generate(
         1,
             (i) => List.generate(
@@ -150,32 +176,55 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         }
       }
 
-      // Security check for non-MRI images or low confidence
-      if (maxProb < 0.50) {
+      // CLOSE WAITING DIALOG
+      if (mounted) Navigator.pop(context);
+
+      // 2. SECURITY CHECK FOR INVALID IMAGES (Threshold strict at 80%)
+      if (maxProb < 0.80) {
         setState(() {
           _isAnalyzing = false;
           _resultStage = null;
           _confidenceScore = null;
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "Unrecognized image! Please upload a clear Brain MRI scan.",
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              title: const Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red, size: 30),
+                  SizedBox(width: 10),
+                  Text("Invalid or Unclear Scan", style: TextStyle(color: Colors.red, fontSize: 18)),
+                ],
+              ),
+              content: const Text(
+                "The AI is not highly confident about this image (Confidence < 80%). Please upload a clearer, standard axial Brain MRI scan.",
+                style: TextStyle(fontSize: 14),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("OK, I'll try again", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-          ),
-        );
+          );
+        }
         return;
       }
 
+      // IF SUCCESSFUL (>= 80% Confidence)
       setState(() {
         _resultStage = _classes[predictedIndex];
         _confidenceScore = "${(maxProb * 100).toStringAsFixed(2)}%";
         _isAnalyzing = false;
       });
+
     } catch (e) {
+      if (mounted) Navigator.pop(context);
+
       print("Inference Error: $e");
       setState(() {
         _isAnalyzing = false;
@@ -410,7 +459,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               onTap: _pickMRI,
               child: Container(
                 width: double.infinity,
-                height: 250,
+                // Screen ki width ke mutabiq perfect square banane ke liye height set ki hai (minus padding)
+                height: MediaQuery.of(context).size.width - 40,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(15),
@@ -430,7 +480,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                 child: _selectedMRI != null
                     ? ClipRRect(
                   borderRadius: BorderRadius.circular(13),
-                  child: Image.file(_selectedMRI!, fit: BoxFit.cover),
+                  child: Image.file(_selectedMRI!, fit: BoxFit.cover), // Square box mein cover theek bethega
                 )
                     : const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -480,7 +530,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                     ),
                     SizedBox(width: 15),
                     Text(
-                      "AI is processing...",
+                      "Processing...",
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 16,
