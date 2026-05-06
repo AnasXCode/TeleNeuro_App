@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../Auth/doctor_login_page.dart';
-
-// --- DATA & WIDGET IMPORTS ---
-// Hum ne yahan se doctor_dummy_data.dart nikal diya hai kyunke ab sab Real Hoga
 import '../Widgets/stat_card.dart';
 import '../Widgets/request_card.dart';
 
@@ -24,12 +21,12 @@ class DoctorDashboard extends StatefulWidget {
 class _DoctorDashboardState extends State<DoctorDashboard> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const DoctorHomeTab(),
-    const DoctorAppointmentsScreen(),
-    const DoctorChatScreen(),
-    const DoctorProfileScreen(),
-  ];
+  // Navigation Logic for "See All"
+  void _jumpToSchedule() {
+    setState(() {
+      _selectedIndex = 1; // Schedule Tab index
+    });
+  }
 
   Future<void> _showLogoutDialog() async {
     return showDialog(
@@ -62,6 +59,14 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // List of screens - Passed jump function to Home Tab
+    final List<Widget> _screens = [
+      DoctorHomeTab(onSeeAll: _jumpToSchedule),
+      const DoctorAppointmentsScreen(),
+      const DoctorChatScreen(),
+      const DoctorProfileScreen(),
+    ];
+
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
@@ -92,7 +97,8 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 }
 
 class DoctorHomeTab extends StatefulWidget {
-  const DoctorHomeTab({super.key});
+  final VoidCallback onSeeAll; // Callback to change tab
+  const DoctorHomeTab({super.key, required this.onSeeAll});
 
   @override
   State<DoctorHomeTab> createState() => _DoctorHomeTabState();
@@ -100,8 +106,8 @@ class DoctorHomeTab extends StatefulWidget {
 
 class _DoctorHomeTabState extends State<DoctorHomeTab> {
   String _doctorName = "Doctor";
-  String _doctorRating = "4.9"; // Fallback Real Rating
-  String _doctorExperience = "5+ Yrs"; // Fallback Real Experience
+  String _doctorRating = "4.9";
+  String _doctorExperience = "5+ Yrs";
   final String _currentDoctorId = FirebaseAuth.instance.currentUser!.uid;
 
   @override
@@ -123,7 +129,6 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
           Map<String, dynamic>? data = doc.data() as Map<String, dynamic>?;
           setState(() {
             _doctorName = data?['name'] ?? 'Doctor';
-            // Agar profile mein rating/experience set hai toh wahan se warna default
             if (data != null && data.containsKey('rating')) _doctorRating = data['rating'].toString();
             if (data != null && data.containsKey('experience')) _doctorExperience = data['experience'].toString();
           });
@@ -179,7 +184,6 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
             ),
             const SizedBox(height: 15),
 
-            // DYNAMIC STATS GRID FROM FIREBASE
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('appointments')
@@ -187,7 +191,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                   .snapshots(),
               builder: (context, snapshot) {
                 int pendingCount = 0;
-                Set<String> uniquePatients = {}; // Set duplicates allow nahi karta
+                Set<String> uniquePatients = {};
 
                 if (snapshot.hasData) {
                   for (var doc in snapshot.data!.docs) {
@@ -198,9 +202,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                     if (status == 'Pending') {
                       pendingCount++;
                     } else if (status == 'Accepted' || status == 'Completed') {
-                      if (patientId.isNotEmpty) {
-                        uniquePatients.add(patientId);
-                      }
+                      if (patientId.isNotEmpty) uniquePatients.add(patientId);
                     }
                   }
                 }
@@ -213,30 +215,10 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                   mainAxisSpacing: 15,
                   childAspectRatio: 1.3,
                   children: [
-                    StatCard(
-                      label: "Total Patients",
-                      value: uniquePatients.length.toString(), // Firebase se live count
-                      icon: Icons.people,
-                      color: Colors.blue,
-                    ),
-                    StatCard(
-                      label: "Pending Requests",
-                      value: pendingCount.toString(), // Firebase se live count
-                      icon: Icons.pending_actions,
-                      color: Colors.orange,
-                    ),
-                    StatCard(
-                      label: "Rating",
-                      value: _doctorRating, // Firestore User Profile se
-                      icon: Icons.star,
-                      color: Colors.amber,
-                    ),
-                    StatCard(
-                      label: "Experience",
-                      value: _doctorExperience, // Firestore User Profile se
-                      icon: Icons.work,
-                      color: Colors.purple,
-                    ),
+                    StatCard(label: "Total Patients", value: uniquePatients.length.toString(), icon: Icons.people, color: Colors.blue),
+                    StatCard(label: "Pending Requests", value: pendingCount.toString(), icon: Icons.pending_actions, color: Colors.orange),
+                    StatCard(label: "Rating", value: _doctorRating, icon: Icons.star, color: Colors.amber),
+                    StatCard(label: "Experience", value: _doctorExperience, icon: Icons.work, color: Colors.purple),
                   ],
                 );
               },
@@ -244,22 +226,17 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
 
             const SizedBox(height: 25),
 
-            // Recent Requests Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  "Recent Requests",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF37474F)),
-                ),
+                const Text("Recent Requests", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF37474F))),
                 TextButton(
-                    onPressed: () {},
+                    onPressed: widget.onSeeAll, // ✅ UPDATED: Ab yeh index switch karega
                     child: const Text("See All")
                 ),
               ],
             ),
 
-            // REAL-TIME REQUESTS LIST
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('appointments')
@@ -268,10 +245,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: CircularProgressIndicator(),
-                  ));
+                  return const Center(child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator()));
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -301,6 +275,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
 
                     Map<String, String> requestData = {
                       'name': (data['patientName'] ?? 'Unknown').toString(),
+                      'age': 'N/A',
                       'issue': (data['problem'] ?? 'Consultation').toString(),
                       'date': (data['date'] ?? '').toString(),
                       'time': (data['time'] ?? '').toString(),
@@ -319,27 +294,13 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
 
             const SizedBox(height: 20),
 
-            // Quick Actions
-            const Text(
-              "Quick Access",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF37474F)),
-            ),
+            const Text("Quick Access", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF37474F))),
             const SizedBox(height: 10),
 
             Container(
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))
-                  ]
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
               child: ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle),
-                  child: const Icon(Icons.people_outline, color: Color(0xFF1565C0)),
-                ),
+                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.people_outline, color: Color(0xFF1565C0))),
                 title: const Text("View All Patients", style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text("Check patient history & reports"),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
