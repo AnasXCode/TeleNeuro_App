@@ -21,6 +21,13 @@ class DoctorDashboard extends StatefulWidget {
 class _DoctorDashboardState extends State<DoctorDashboard> {
   int _selectedIndex = 0;
 
+  // ✅ Dashboard (Home) par wapis aane ki logic
+  void _goToHome() {
+    setState(() {
+      _selectedIndex = 0;
+    });
+  }
+
   // Navigation Logic for "See All"
   void _jumpToSchedule() {
     setState(() {
@@ -59,10 +66,10 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // List of screens - Passed jump function to Home Tab
+    // List of screens - Passed jump function to Home Tab and back function to Appointments Tab
     final List<Widget> _screens = [
       DoctorHomeTab(onSeeAll: _jumpToSchedule),
-      const DoctorAppointmentsScreen(),
+      DoctorAppointmentsScreen(onBack: _goToHome), // ✅ Yahan onBack pass kiya gaya hai
       const DoctorChatScreen(),
       const DoctorProfileScreen(),
     ];
@@ -71,7 +78,14 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
-        _showLogoutDialog();
+
+        // ✅ Agar user Home tab par nahi hai, toh back dabane par Home tab par le jao
+        if (_selectedIndex != 0) {
+          _goToHome();
+        } else {
+          // Agar user pehle hi Home tab par hai, tab Logout dialog show karo
+          _showLogoutDialog();
+        }
       },
       child: Scaffold(
         body: _screens[_selectedIndex],
@@ -231,7 +245,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
               children: [
                 const Text("Recent Requests", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF37474F))),
                 TextButton(
-                    onPressed: widget.onSeeAll, // ✅ UPDATED: Ab yeh index switch karega
+                    onPressed: widget.onSeeAll,
                     child: const Text("See All")
                 ),
               ],

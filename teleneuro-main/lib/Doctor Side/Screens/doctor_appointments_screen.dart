@@ -6,7 +6,9 @@ import '../Widgets/appointment_card.dart';
 import '../Widgets/request_card.dart';
 
 class DoctorAppointmentsScreen extends StatefulWidget {
-  const DoctorAppointmentsScreen({super.key});
+  final VoidCallback onBack; // ✅ Naya callback add kiya gaya hai
+
+  const DoctorAppointmentsScreen({super.key, required this.onBack});
 
   @override
   State<DoctorAppointmentsScreen> createState() => _DoctorAppointmentsScreenState();
@@ -45,6 +47,11 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
           title: const Text("Appointments", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           backgroundColor: const Color(0xFF1565C0),
           centerTitle: true,
+          // ✅ Back Arrow Logic Update (Logout rokne ke liye)
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: widget.onBack,
+          ),
           bottom: const TabBar(
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white60,

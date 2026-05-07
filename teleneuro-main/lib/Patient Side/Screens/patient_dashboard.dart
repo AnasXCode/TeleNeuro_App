@@ -185,9 +185,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 final docs = snapshot.data!.docs;
                 if (docs.isEmpty) return const Center(child: Text("No specialists registered yet."));
 
-                // ✅ SORTING LOGIC: Highest Rating Doctors First
-                List<DocumentSnapshot> sortedDocs = List.from(docs);
-                sortedDocs.sort((a, b) {
+                // ✅ 1. FILTERING LOGIC: Sirf 4.0 ya us se zyada rating wale doctors
+                var topRatedDocs = docs.where((doc) {
+                  var data = doc.data() as Map<String, dynamic>?;
+                  if (data == null) return false;
+                  double rating = (data['rating'] ?? 0.0).toDouble();
+                  return rating >= 4.0; // New doctors automatically nikal jayenge
+                }).toList();
+
+                // ✅ 2. SORTING LOGIC: Highest Rating Doctors First
+                topRatedDocs.sort((a, b) {
                   var dataA = a.data() as Map<String, dynamic>;
                   var dataB = b.data() as Map<String, dynamic>;
                   double ratingA = (dataA['rating'] ?? 0.0).toDouble();
@@ -195,22 +202,22 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   return ratingB.compareTo(ratingA); // Descending order
                 });
 
-                // ✅ FILTERING LOGIC (Applied on Sorted Docs)
-                final filteredDocs = sortedDocs.where((doc) {
+                // ✅ 3. SEARCH & LIMIT: Search apply karein aur sirf top 5 dikhayein
+                final displayList = topRatedDocs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>?;
                   if (data == null) return false;
                   final name = (data['name'] ?? '').toString().toLowerCase();
                   return name.contains(_searchQuery.toLowerCase());
-                }).toList();
+                }).take(5).toList(); // Sirf Top 5 doctors yahan se filter honge
 
-                if (filteredDocs.isEmpty) return const Center(child: Text("No matching doctor"));
+                if (displayList.isEmpty) return const Center(child: Text("More top rated doctors joining soon!", style: TextStyle(color: Colors.grey)));
 
                 return ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
-                  itemCount: filteredDocs.length,
+                  itemCount: displayList.length, // Ab displayList use ho rahi hai
                   itemBuilder: (context, index) {
-                    final doc = filteredDocs[index];
+                    final doc = displayList[index];
                     final data = doc.data() as Map<String, dynamic>?;
                     final docId = doc.id;
 
