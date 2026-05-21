@@ -271,28 +271,70 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                               style: TextStyle(color: Colors.grey))),
                     );
                   }
+                  final docs = snapshot.data!.docs.toList()
+                    ..sort((a, b) {
+                      final ta = (a.data() as Map)['timestamp'];
+                      final tb = (b.data() as Map)['timestamp'];
+                      if (ta is! Timestamp) return 1;
+                      if (tb is! Timestamp) return -1;
+                      return tb.compareTo(ta);
+                    });
+
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: snapshot.data!.docs.length,
+                    itemCount: docs.length,
                     itemBuilder: (context, i) {
-                      final d = snapshot.data!.docs[i].data()
-                          as Map<String, dynamic>;
+                      final d = docs[i].data() as Map<String, dynamic>;
                       final stars = (d['givenRating'] ?? 0).toDouble();
+                      final review = (d['reviewText'] ??
+                              d['review'] ??
+                              d['comment'] ??
+                              '')
+                          .toString()
+                          .trim();
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          title: Text(d['patientName'] ?? 'Patient',
-                              style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(
-                              '"${d['reviewText'] ?? 'No comment'}"',
-                              style: const TextStyle(fontStyle: FontStyle.italic)),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        margin: const EdgeInsets.only(bottom: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('$stars'),
-                              const Icon(Icons.star,
-                                  color: Colors.amber, size: 16),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(d['patientName'] ?? 'Patient',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  Row(
+                                    children: [
+                                      Text('$stars',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      const Icon(Icons.star,
+                                          color: Colors.amber, size: 18),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                review.isEmpty
+                                    ? 'No written feedback.'
+                                    : review,
+                                style: TextStyle(
+                                  fontStyle: review.isEmpty
+                                      ? FontStyle.italic
+                                      : FontStyle.normal,
+                                  height: 1.45,
+                                  color: review.isEmpty
+                                      ? Colors.grey
+                                      : Colors.black87,
+                                ),
+                              ),
                             ],
                           ),
                         ),

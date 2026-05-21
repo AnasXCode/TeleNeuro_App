@@ -5,6 +5,10 @@ import 'package:intl/intl.dart';
 import '../../Patient Side/Screens/chat_screen.dart';
 import '../../services/chat_service.dart';
 import '../../services/notification_service.dart';
+import 'patient_profile_view_screen.dart';
+
+const Color _chatPrimary = Color(0xFF1565C0);
+const Color _chatBg = Color(0xFFF0F4F8);
 
 class DoctorChatScreen extends StatelessWidget {
   const DoctorChatScreen({super.key});
@@ -94,10 +98,11 @@ class DoctorChatScreen extends StatelessWidget {
     final String? currentDoctorId = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F9FC),
+      backgroundColor: _chatBg,
       appBar: AppBar(
         title: const Text('My Messages'),
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: _chatPrimary,
+        foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -108,7 +113,10 @@ class DoctorChatScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No chats history.'));
+            return Center(
+              child: Text('No chats yet.',
+                  style: TextStyle(color: Colors.grey.shade600)),
+            );
           }
 
           var visibleDocs = snapshot.data!.docs.where((doc) {
@@ -129,6 +137,7 @@ class DoctorChatScreen extends StatelessWidget {
           }
 
           return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: visibleDocs.length,
             itemBuilder: (context, index) {
               var data = visibleDocs[index].data() as Map<String, dynamic>;
@@ -140,102 +149,191 @@ class DoctorChatScreen extends StatelessWidget {
               final lastMsg =
                   (data['lastMessage'] ?? 'Tap to chat').toString();
               final lastTime = _formatListTime(data['lastMessageTime']);
+              final patientName = (data['patientName'] ?? 'Unknown').toString();
+              final patientId = (data['patientId'] ?? '').toString();
 
-              return Card(
-                margin:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                child: ListTile(
-                  leading: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: isCompleted
-                            ? Colors.grey[300]
-                            : const Color(0xFFE3F2FD),
-                        child: Icon(Icons.person,
-                            color: isCompleted
-                                ? Colors.grey
-                                : const Color(0xFF1565C0)),
-                      ),
-                      if (unread > 0)
-                        Positioned(
-                          right: -2,
-                          top: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              unread > 9 ? '9+' : '$unread',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold),
+              void openChat() {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ChatScreen(
+                      receiverId: patientId,
+                      receiverName: patientName,
+                      appointmentId: docId,
+                      isDoctorViewer: true,
+                    ),
+                  ),
+                );
+              }
+
+              void openPatientProfile() {
+                if (patientId.isEmpty) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PatientProfileViewPage(
+                      patientId: patientId,
+                      fallbackName: patientName,
+                    ),
+                  ),
+                );
+              }
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: openChat,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: openPatientProfile,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                CircleAvatar(
+                                  radius: 26,
+                                  backgroundColor: isCompleted
+                                      ? Colors.grey[300]
+                                      : const Color(0xFFE3F2FD),
+                                  child: Icon(Icons.person,
+                                      color: isCompleted
+                                          ? Colors.grey
+                                          : _chatPrimary),
+                                ),
+                                if (unread > 0)
+                                  Positioned(
+                                    right: -2,
+                                    top: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(5),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      constraints: const BoxConstraints(
+                                          minWidth: 18, minHeight: 18),
+                                      child: Text(
+                                        unread > 9 ? '9+' : '$unread',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                        ),
-                    ],
-                  ),
-                  title: Text(data['patientName'] ?? 'Unknown',
-                      style: TextStyle(
-                          fontWeight:
-                              unread > 0 ? FontWeight.bold : FontWeight.w500,
-                          color:
-                              isCompleted ? Colors.grey : Colors.black)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(lastMsg,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: unread > 0
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                          )),
-                      if (lastTime.isNotEmpty)
-                        Text(lastTime, style: const TextStyle(fontSize: 11)),
-                      Text(
-                        isCompleted ? 'Session Ended' : 'Active Session',
-                        style: TextStyle(
-                            color: isCompleted ? Colors.red : Colors.green,
-                            fontSize: 11),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: openPatientProfile,
+                              behavior: HitTestBehavior.opaque,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(patientName,
+                                            style: TextStyle(
+                                              fontWeight: unread > 0
+                                                  ? FontWeight.bold
+                                                  : FontWeight.w600,
+                                              fontSize: 15,
+                                              color: isCompleted
+                                                  ? Colors.grey
+                                                  : Colors.black87,
+                                            )),
+                                      ),
+                                      if (lastTime.isNotEmpty)
+                                        Text(lastTime,
+                                            style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.grey.shade600)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(lastMsg,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: unread > 0
+                                            ? Colors.black87
+                                            : Colors.grey.shade600,
+                                        fontWeight: unread > 0
+                                            ? FontWeight.w600
+                                            : FontWeight.normal,
+                                        fontSize: 13,
+                                      )),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: (isCompleted
+                                              ? Colors.red
+                                              : Colors.green)
+                                          .withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      isCompleted
+                                          ? 'Session Ended'
+                                          : 'Active Session',
+                                      style: TextStyle(
+                                        color: isCompleted
+                                            ? Colors.red.shade700
+                                            : Colors.green.shade700,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chat_bubble_rounded,
+                                color: _chatPrimary),
+                            onPressed: openChat,
+                          ),
+                          if (isCompleted)
+                            IconButton(
+                              icon: Icon(Icons.delete_outline,
+                                  color: Colors.red.shade400),
+                              onPressed: () => _deleteChat(context, docId),
+                            )
+                          else
+                            IconButton(
+                              icon: const Icon(Icons.check_circle,
+                                  color: Colors.green),
+                              onPressed: () => _endSession(
+                                  context, docId, patientName),
+                            ),
+                        ],
                       ),
-                    ],
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline,
-                            color: Colors.blue),
-                        onPressed: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => ChatScreen(
-                                        receiverId: data['patientId'],
-                                        receiverName: data['patientName'],
-                                        appointmentId: docId,
-                                      )));
-                        },
-                      ),
-                      if (isCompleted)
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              color: Colors.red),
-                          onPressed: () => _deleteChat(context, docId),
-                        )
-                      else
-                        IconButton(
-                          icon: const Icon(Icons.check_circle,
-                              color: Colors.green),
-                          onPressed: () => _endSession(
-                              context, docId, data['patientName']),
-                        ),
-                    ],
+                    ),
                   ),
                 ),
               );

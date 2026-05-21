@@ -307,6 +307,7 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                 onPressed: _isLoading ? null : _bookAppointment,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -314,7 +315,9 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text("Book Appointment",
                     style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold)),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
               ),
             ),
           ],

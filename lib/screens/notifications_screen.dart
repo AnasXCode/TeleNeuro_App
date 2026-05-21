@@ -13,15 +13,6 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      NotificationService.markAllAsRead(uid);
-    }
-  }
-
   IconData _iconForType(String type) {
     switch (type) {
       case 'appointment_request':

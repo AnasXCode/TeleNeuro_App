@@ -385,7 +385,12 @@ class _DoctorReviewsList extends StatelessWidget {
             final d = doc.data() as Map<String, dynamic>;
             final stars = (d['givenRating'] ?? 0).toDouble();
             final patient = (d['patientName'] ?? 'Patient').toString();
-            final review = (d['reviewText'] ?? '').toString().trim();
+            final review = (d['reviewText'] ??
+                    d['review'] ??
+                    d['comment'] ??
+                    '')
+                .toString()
+                .trim();
             return Container(
               width: double.infinity,
               margin: const EdgeInsets.only(bottom: 10),

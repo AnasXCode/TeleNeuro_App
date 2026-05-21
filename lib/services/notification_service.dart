@@ -155,4 +155,36 @@ class NotificationService {
     }
     await batch.commit();
   }
+
+  /// Marks unread message notifications for a chat/appointment as read.
+  static Future<void> markMessageNotificationsRead({
+    required String userId,
+    String? appointmentId,
+    String? senderId,
+  }) async {
+    if (userId.isEmpty) return;
+
+    Query<Map<String, dynamic>> query = _collection
+        .where('userId', isEqualTo: userId)
+        .where('type', isEqualTo: 'message')
+        .where('isRead', isEqualTo: false);
+
+    final snap = await query.get();
+    if (snap.docs.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final related = (data['relatedId'] ?? '').toString();
+      final sender = (data['senderId'] ?? '').toString();
+      final matchesAppointment =
+          appointmentId != null && appointmentId.isNotEmpty && related == appointmentId;
+      final matchesSender =
+          senderId != null && senderId.isNotEmpty && sender == senderId;
+      if (matchesAppointment || matchesSender || (appointmentId == null && senderId == null)) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+    }
+    await batch.commit();
+  }
 }

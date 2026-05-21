@@ -9,13 +9,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import '../../supabase_config.dart';
 import 'package:image/image.dart' as img;
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
-import 'package:open_file/open_file.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../widgets/share_report_dialog.dart';
+import '../../services/lab_report_pdf_service.dart';
 import 'package:storage_client/storage_client.dart' show FileOptions, StorageException;
 
 // Theme Colors
@@ -35,6 +32,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
   File? _selectedMRI;
   final ImagePicker _picker = ImagePicker();
   bool _isAnalyzing = false;
+  bool _isGeneratingPdf = false;
   String? _resultStage;
   String? _confidenceScore;
   String? _pdfFilePath;
@@ -230,6 +228,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         _isAnalyzing = false;
       });
 
+      await _autoSaveScanToLabReports();
+
     } catch (e) {
       if (mounted) Navigator.pop(context);
 
@@ -242,223 +242,162 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     }
   }
 
-  String _getClinicalDescription(String stage) {
-    switch (stage) {
-      case 'Non Demented':
-        return "Clinical Evaluation: The AI analysis of the provided axial MRI scan reveals no significant structural anomalies indicative of Alzheimer's disease or related dementias. Cortical thickness, ventricular volume, and hippocampal structures appear to be within expected limits for a healthy cognitive profile. No immediate pathological markers were detected.";
-      case 'Very Mild Demented':
-        return "Clinical Evaluation: The radiological assessment indicates subtle, early-stage structural variations. These may include incipient volumetric changes in the hippocampus or mild cortical thinning. Such features are frequently correlated with Very Mild Cognitive Impairment (MCI). Baseline cognitive testing and longitudinal clinical monitoring are recommended.";
-      case 'Mild Demented':
-        return "Clinical Evaluation: The analysis highlights mild but distinct cortical atrophy alongside early signs of ventricular enlargement. These structural markers are highly consistent with Mild Dementia/Alzheimer's progression. A comprehensive neurological evaluation and clinical correlation are strongly advised to establish a patient care plan.";
-      case 'Moderate Demented':
-        return "Clinical Evaluation: The scan reveals pronounced cerebral atrophy, significant ventricular expansion, and notable hippocampal volume loss. These prominent radiological features are highly characteristic of Moderate Dementia. Immediate consultation with a specialized neurologist is recommended for advanced disease management and intervention.";
-      default:
-        return "Diagnostic analysis complete. Please consult a specialized physician for detailed clinical correlation and review.";
+  Future<({
+    String patientName,
+    String patientEmail,
+    String reportId,
+  })> _resolvePatientContext({String? existingReportId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final user = FirebaseAuth.instance.currentUser;
+
+    String? firestoreName;
+    String? firestoreEmail;
+
+    if (user != null) {
+      try {
+        final doc =
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final data = doc.data();
+        if (data != null) {
+          firestoreName = (data['name'] as String?)?.trim();
+          firestoreEmail = (data['email'] as String?)?.trim();
+        }
+      } catch (_) {}
     }
+
+    String firstNonEmpty(List<String?> values, String fallback) {
+      for (final v in values) {
+        if (v != null && v.trim().isNotEmpty) return v.trim();
+      }
+      return fallback;
+    }
+
+    final patientName = firstNonEmpty(
+        [firestoreName, prefs.getString('name'), user?.displayName], 'Patient');
+    final patientEmail = firstNonEmpty(
+        [firestoreEmail, prefs.getString('email'), user?.email],
+        'Email Not Provided');
+
+    if (patientName != 'Patient') await prefs.setString('name', patientName);
+    if (patientEmail != 'Email Not Provided') {
+      await prefs.setString('email', patientEmail);
+    }
+
+    var reportId =
+        'TN-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+    if (_currentReportDocId != null) {
+      final existing = await FirebaseFirestore.instance
+          .collection('mri_reports')
+          .doc(_currentReportDocId!)
+          .get();
+      if (existing.exists) {
+        reportId = (existing.data()?['reportId'] ?? reportId).toString();
+      }
+    } else if (existingReportId != null && existingReportId.isNotEmpty) {
+      reportId = existingReportId;
+    }
+
+    return (
+      patientName: patientName,
+      patientEmail: patientEmail,
+      reportId: reportId,
+    );
   }
 
-  // --- DETAILED PDF REPORT GENERATION FUNCTION ---
-  Future<void> _generateAndDownloadPDF() async {
-    if (_resultStage == null || _selectedMRI == null) return;
+  Future<String?> _buildSaveAndPublishPdf({
+    required String reportId,
+    required String patientName,
+    required String patientEmail,
+    required Uint8List imageBytes,
+    String? updateDocId,
+  }) async {
+    if (_resultStage == null || _confidenceScore == null) return null;
 
+    setState(() => _isGeneratingPdf = true);
     try {
-      final pdf = pw.Document();
-      final imageBytes = await _selectedMRI!.readAsBytes();
-      final pdfImage = pw.MemoryImage(imageBytes);
-
-      final prefs = await SharedPreferences.getInstance();
-      final user = FirebaseAuth.instance.currentUser;
-
-      String? firestoreName;
-      String? firestoreEmail;
-
-      if (user != null) {
-        try {
-          final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-          final data = doc.data();
-          if (data != null) {
-            firestoreName = (data['name'] as String?)?.trim();
-            firestoreEmail = (data['email'] as String?)?.trim();
-          }
-        } catch (e) {}
-      }
-
-      String firstNonEmpty(List<String?> values, String fallback) {
-        for (final v in values) {
-          if (v != null && v.trim().isNotEmpty) return v.trim();
-        }
-        return fallback;
-      }
-
-      final String patientName = firstNonEmpty([firestoreName, prefs.getString('name'), user?.displayName], 'Patient');
-      final String patientEmail = firstNonEmpty([firestoreEmail, prefs.getString('email'), user?.email], 'Email Not Provided');
-
-      if (patientName != 'Patient') await prefs.setString('name', patientName);
-      if (patientEmail != 'Email Not Provided') await prefs.setString('email', patientEmail);
-
-      String reportDate = DateTime.now().toString().substring(0, 10);
-      String reportTime = DateTime.now().toString().substring(11, 16);
-      String patientID = "TN-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}";
-
-      String clinicalNotes = _getClinicalDescription(_resultStage!);
-
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(32),
-          build: (pw.Context context) {
-            return [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text("TeleNeuro", style: pw.TextStyle(fontSize: 26, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                      pw.Text("AI Neurological Diagnostic System", style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text("Report ID: $patientID", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text("Date: $reportDate"),
-                      pw.Text("Time: $reportTime"),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
-              pw.Divider(thickness: 2, color: PdfColors.blue900),
-              pw.SizedBox(height: 15),
-
-              pw.Text("PATIENT DEMOGRAPHICS", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.SizedBox(height: 8),
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey300),
-                columnWidths: {
-                  0: const pw.FlexColumnWidth(1),
-                  1: const pw.FlexColumnWidth(2),
-                  2: const pw.FlexColumnWidth(1),
-                  3: const pw.FlexColumnWidth(2),
-                },
-                children: [
-                  pw.TableRow(children: [
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text("Patient Name:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(patientName)),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text("Account Email:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-                    pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Text(patientEmail)),
-                  ]),
-                ],
-              ),
-              pw.SizedBox(height: 25),
-
-              pw.Container(
-                padding: const pw.EdgeInsets.all(15),
-                decoration: pw.BoxDecoration(
-                    color: PdfColors.blue50,
-                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                    border: pw.Border.all(color: PdfColors.blue200)
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text("AI DIAGNOSTIC SUMMARY", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue900)),
-                    pw.SizedBox(height: 12),
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Text("Detected Neurological Stage:", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                        pw.Text(_resultStage!, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
-                      ],
-                    ),
-                    pw.SizedBox(height: 8),
-                    pw.Row(
-                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                      children: [
-                        pw.Text("Model Confidence Level:", style: const pw.TextStyle(fontSize: 14)),
-                        pw.Text(_confidenceScore!, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 20),
-
-              pw.Text("CLINICAL NOTES & OBSERVATIONS", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800)),
-              pw.SizedBox(height: 8),
-              pw.Paragraph(
-                text: clinicalNotes,
-                style: const pw.TextStyle(fontSize: 11, lineSpacing: 2),
-                textAlign: pw.TextAlign.justify,
-              ),
-              pw.SizedBox(height: 25),
-
-              pw.Center(child: pw.Text("PROVIDED MRI SCAN (AXIAL VIEW)", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.blue800))),
-              pw.SizedBox(height: 10),
-              pw.Center(
-                child: pw.Container(
-                  padding: const pw.EdgeInsets.all(5),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.grey500, width: 2),
-                  ),
-                  child: pw.Image(pdfImage, width: 200, height: 200),
-                ),
-              ),
-
-              pw.SizedBox(height: 40),
-
-              pw.Divider(color: PdfColors.grey400),
-              pw.Text("Examining Physician's Remarks / Signature:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 40),
-              pw.Divider(color: PdfColors.grey400),
-              pw.SizedBox(height: 10),
-              pw.Center(
-                child: pw.Text(
-                  "DISCLAIMER: This diagnostic report is algorithmically generated by the TeleNeuro Vision Transformer (ViT) AI model. It is designed to act as a Clinical Decision Support System (CDSS) and does not replace professional medical advice, diagnosis, or treatment.",
-                  textAlign: pw.TextAlign.center,
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
-                ),
-              ),
-            ];
-          },
-        ),
+      final clinicalNotes =
+          LabReportPdfService.clinicalDescriptionForStage(_resultStage!);
+      final pdfBytes = await LabReportPdfService.generateReportPdf(
+        reportId: reportId,
+        patientName: patientName,
+        patientEmail: patientEmail,
+        stage: _resultStage!,
+        confidence: _confidenceScore!,
+        clinicalNotes: clinicalNotes,
+        mriImageBytes: imageBytes,
       );
 
-      final pdfBytes = Uint8List.fromList(await pdf.save());
+      final localPath = await LabReportPdfService.savePdfToDocuments(
+        reportId: reportId,
+        pdfBytes: pdfBytes,
+      );
 
-      // ✅ 1. Upload to Firebase and get Document ID
-      String? reportDocId = await _publishMriReportToFirebase(
-        reportId: patientID,
+      final docId = await _publishMriReportToFirebase(
+        reportId: reportId,
         patientName: patientName,
         patientEmail: patientEmail,
         stage: _resultStage!,
         confidence: _confidenceScore!,
         clinicalNotes: clinicalNotes,
         pdfBytes: pdfBytes,
+        localPdfPath: localPath,
         imageBytes: imageBytes,
         mriSourceFile: _selectedMRI!,
+        updateDocId: updateDocId,
       );
 
-      final output = await getTemporaryDirectory();
-      final file = File("${output.path}/TeleNeuro_Report_$patientID.pdf");
-      await file.writeAsBytes(pdfBytes);
+      if (mounted) {
+        setState(() {
+          _pdfFilePath = localPath;
+          _currentReportDocId = docId ?? _currentReportDocId;
+        });
+      }
+      return localPath;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating report: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _isGeneratingPdf = false);
+    }
+  }
 
-      setState(() {
-        _pdfFilePath = file.path;
-        _currentReportDocId = reportDocId; // Save id for sharing later
-      });
+  Future<void> _generateAndDownloadPDF() async {
+    if (_resultStage == null || _selectedMRI == null || _isGeneratingPdf) {
+      return;
+    }
+
+    try {
+      final imageBytes = await _selectedMRI!.readAsBytes();
+      final ctx = await _resolvePatientContext();
+      final localPath = await _buildSaveAndPublishPdf(
+        reportId: ctx.reportId,
+        patientName: ctx.patientName,
+        patientEmail: ctx.patientEmail,
+        imageBytes: imageBytes,
+        updateDocId: _currentReportDocId,
+      );
+
+      if (localPath == null) return;
 
       try {
-        await OpenFile.open(file.path);
+        await LabReportPdfService.openPdf(localPath);
       } catch (e) {
-        debugPrint('OpenFile failed (PDF still saved): $e');
+        debugPrint('OpenFilex failed (PDF still saved): $e');
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('PDF report ready. Use Share PDF to send it anywhere.'),
+            content: Text(
+                'PDF report ready. Use Share PDF to send it anywhere.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
@@ -466,7 +405,12 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error generating report: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating report: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
@@ -478,7 +422,52 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     return (ext: 'jpg', mime: 'image/jpeg');
   }
 
-  // ✅ RETURN TYPE CHANGE: Ab ye return karega document ID (String?)
+  /// Saves scan + PDF to Lab Reports immediately after AI analysis.
+  Future<void> _autoSaveScanToLabReports() async {
+    if (_selectedMRI == null ||
+        _resultStage == null ||
+        _confidenceScore == null ||
+        _currentReportDocId != null) {
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final imageBytes = await _selectedMRI!.readAsBytes();
+      final ctx = await _resolvePatientContext();
+      final localPath = await _buildSaveAndPublishPdf(
+        reportId: ctx.reportId,
+        patientName: ctx.patientName,
+        patientEmail: ctx.patientEmail,
+        imageBytes: imageBytes,
+        updateDocId: null,
+      );
+
+      if (localPath != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Lab report and PDF saved. Open it from My Lab Reports.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Auto-save scan failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Report saved but PDF failed: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
+  }
+
   Future<String?> _publishMriReportToFirebase({
     required String reportId,
     required String patientName,
@@ -486,9 +475,11 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     required String stage,
     required String confidence,
     required String clinicalNotes,
-    required Uint8List pdfBytes,
+    Uint8List? pdfBytes,
+    String? localPdfPath,
     required Uint8List imageBytes,
     required File mriSourceFile,
+    String? updateDocId,
   }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
@@ -505,15 +496,16 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       await storage.uploadBinary(imagePath, imageBytes, fileOptions: FileOptions(contentType: fmt.mime, upsert: true));
       imageUrl = storage.getPublicUrl(imagePath);
 
-      await storage.uploadBinary(pdfPath, pdfBytes, fileOptions: const FileOptions(contentType: 'application/pdf', upsert: true));
-      pdfUrl = storage.getPublicUrl(pdfPath);
+      if (pdfBytes != null) {
+        await storage.uploadBinary(pdfPath, pdfBytes, fileOptions: const FileOptions(contentType: 'application/pdf', upsert: true));
+        pdfUrl = storage.getPublicUrl(pdfPath);
+      }
     } catch (e) {
       debugPrint('Supabase upload failed: $e');
     }
 
     try {
-      // Create Document in Firestore
-      DocumentReference docRef = await FirebaseFirestore.instance.collection('mri_reports').add({
+      final payload = {
         'patientUid': user.uid,
         'patientName': patientName,
         'patientEmail': patientEmail,
@@ -521,14 +513,41 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         'stage': stage,
         'confidence': confidence,
         'clinicalNotes': clinicalNotes,
-        'pdfUrl': pdfUrl,
-        'imageUrl': imageUrl,
+        if (pdfUrl != null) 'pdfUrl': pdfUrl,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (localPdfPath != null) 'localPdfPath': localPdfPath,
         'storage': 'supabase',
+        'pdfReady': pdfBytes != null,
+        'sharedWith': <String>[],
+      };
+
+      final targetId = updateDocId ?? _currentReportDocId;
+      if (targetId != null && targetId.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('mri_reports')
+            .doc(targetId)
+            .set({
+          ...payload,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        if (mounted && pdfBytes != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              duration: Duration(seconds: 4),
+              backgroundColor: Colors.green,
+              content: Text('PDF added to your Lab Report.'),
+            ),
+          );
+        }
+        return targetId;
+      }
+
+      final docRef = await FirebaseFirestore.instance.collection('mri_reports').add({
+        ...payload,
         'createdAt': FieldValue.serverTimestamp(),
-        'sharedWith': [], // 👈 MAIN PRIVACY FIX: Report is private by default!
       });
 
-      if (mounted) {
+      if (mounted && pdfBytes != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             duration: Duration(seconds: 4),
@@ -537,7 +556,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
           ),
         );
       }
-      return docRef.id; // Returns document ID to use in Share logic
+      return docRef.id;
     } catch (e) {
       debugPrint('Firestore sync failed: $e');
       return null;
@@ -705,12 +724,70 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton.icon(
-                      onPressed: _generateAndDownloadPDF,
-                      icon: const Icon(Icons.picture_as_pdf, color: Colors.white),
-                      label: const Text("Download PDF Report", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 5),
+                      onPressed: _isGeneratingPdf ? null : _generateAndDownloadPDF,
+                      icon: _isGeneratingPdf
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.picture_as_pdf, color: Colors.white),
+                      label: Text(
+                        _isGeneratingPdf
+                            ? 'Generating PDF...'
+                            : (_pdfFilePath != null
+                                ? 'Regenerate & Open PDF'
+                                : 'Download PDF Report'),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          elevation: 5),
                     ),
                   ),
+                  if (_pdfFilePath != null) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          try {
+                            await LabReportPdfService.openPdf(_pdfFilePath!);
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Could not open PDF: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.open_in_new, color: kPrimaryColor),
+                        label: const Text(
+                          'Open PDF',
+                          style: TextStyle(
+                              color: kPrimaryColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: kPrimaryColor, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
 
                   if (_pdfFilePath != null) ...[
                     const SizedBox(height: 12),

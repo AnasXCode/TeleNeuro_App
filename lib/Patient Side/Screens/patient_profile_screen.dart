@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../Auth/patient_login_page.dart';
 
 const Color kPrimaryColor = Color(0xFF1565C0);
 const Color kAccentColor = Color(0xFFE3F2FD);
@@ -336,6 +337,84 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     }
   }
 
+  void _handleDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account?',
+            style: TextStyle(color: Colors.red)),
+        content: const Text(
+          'This will permanently delete your profile, lab reports, and account data. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user == null) return;
+                final uid = user.uid;
+
+                final reports = await FirebaseFirestore.instance
+                    .collection('mri_reports')
+                    .where('patientUid', isEqualTo: uid)
+                    .get();
+                final batch = FirebaseFirestore.instance.batch();
+                for (final doc in reports.docs) {
+                  batch.delete(doc.reference);
+                }
+                await batch.commit();
+
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(uid)
+                    .delete();
+                await user.delete();
+
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+
+                if (!context.mounted) return;
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const LoginScreen()),
+                  (_) => false,
+                );
+              } on FirebaseAuthException catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      e.code == 'requires-recent-login'
+                          ? 'Please sign in again, then retry account deletion.'
+                          : (e.message ?? 'Could not delete account'),
+                    ),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Could not delete account: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -427,6 +506,35 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                   : const Text('Save Changes',
                       style: TextStyle(
                           color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 32),
+          const Divider(),
+          const SizedBox(height: 8),
+          const Text(
+            'Danger zone',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.red,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              onPressed: _handleDeleteAccount,
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text(
+                'Delete Account',
+                style: TextStyle(
+                    color: Colors.red, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],

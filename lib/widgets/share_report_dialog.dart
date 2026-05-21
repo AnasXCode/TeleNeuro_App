@@ -52,13 +52,37 @@ Future<void> showShareReportDialog(
                 trailing: const Icon(Icons.send, color: Colors.green),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  await ReportShareService.shareReport(
+                  final ok = await ReportShareService.shareReport(
                     context: context,
                     reportDocId: reportDocId,
                     doctorId: docId,
                     doctorName: docName,
                     reportTitle: reportTitle,
                   );
+                  if (!context.mounted) return;
+                  if (!ok) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Row(
+                          children: [
+                            const Icon(Icons.error_outline,
+                                color: Colors.white),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Could not send report to $docName. Please try again.',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: Colors.red.shade700,
+                        behavior: SnackBarBehavior.floating,
+                        duration: const Duration(seconds: 4),
+                      ),
+                    );
+                  }
                 },
               ),
             );

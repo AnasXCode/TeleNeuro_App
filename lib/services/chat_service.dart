@@ -58,11 +58,22 @@ class ChatService {
   static Future<void> clearUnread({
     required String appointmentId,
     required bool isDoctor,
+    String? readerUserId,
+    String? senderId,
   }) async {
     await _db.collection('appointments').doc(appointmentId).update({
       if (isDoctor) 'doctorUnread': 0,
       if (!isDoctor) 'patientUnread': 0,
     });
+
+    final uid = readerUserId ?? FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await NotificationService.markMessageNotificationsRead(
+        userId: uid,
+        appointmentId: appointmentId,
+        senderId: senderId,
+      );
+    }
   }
 
   static int unreadForUser(Map<String, dynamic> apt, String uid) {
