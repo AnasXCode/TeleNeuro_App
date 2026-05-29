@@ -20,7 +20,15 @@ class DoctorCard extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (context) => DoctorProfilePage(
+              // ✅ FIXED: doctorId pass kar rahe hain (Agar null ho to random string)
               doctorId: doctor['uid'] ?? 'unknown_doctor',
+              doctorName: doctor['name'] ?? 'Unknown',
+              specialty: doctor['spec'] ?? 'Specialist',
+              about: doctor['about'] ?? 'No details available.',
+              exp: doctor['exp'] ?? 'N/A',
+              patients: doctor['patients'] ?? '0',
+              education: doctor['education'] ?? 'MBBS',
+              timing: doctor['timing'] ?? 'Available',
             ),
           ),
         );

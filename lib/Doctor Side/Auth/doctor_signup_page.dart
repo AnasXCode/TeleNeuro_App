@@ -77,15 +77,11 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
         'email': email,
         'role': 'Doctor',
         'speciality': 'General Physician',
-        'qualifications': '',
-        'about': '',
-        'hospital': '',
-        'phone': '',
-        'experience': '0 Years',
-        'consultationFee': '',
-        'availability': 'Mon–Fri 9:00 AM – 5:00 PM',
+
+        // ✅ NEW LOGIC: Default rating for new doctors
         'rating': 0.0,
         'totalReviews': 0,
+
         'createdAt': FieldValue.serverTimestamp(),
       });
 

@@ -11,8 +11,6 @@ import 'doctor_mri_reports_screen.dart';
 import 'my_patients_screen.dart';
 import 'doctor_chat_screen.dart';
 import 'doctor_profile_screen.dart';
-import '../../widgets/notification_icon_button.dart';
-import '../../services/notification_service.dart';
 
 class DoctorDashboard extends StatefulWidget {
   const DoctorDashboard({super.key});
@@ -158,26 +156,9 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
 
   Future<void> _handleRequest(String docId, String status) async {
     try {
-      final aptDoc = await FirebaseFirestore.instance
-          .collection('appointments')
-          .doc(docId)
-          .get();
-      final apt = aptDoc.data() ?? {};
-
       await FirebaseFirestore.instance.collection('appointments').doc(docId).update({
         'status': status,
       });
-
-      if (status == 'Accepted' || status == 'Declined') {
-        await NotificationService.appointmentStatus(
-          patientId: (apt['patientId'] ?? '').toString(),
-          doctorName: _doctorName,
-          status: status == 'Accepted' ? 'approved' : 'declined',
-          appointmentId: docId,
-          doctorId: _currentDoctorId,
-        );
-      }
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(status == 'Accepted' ? "Request Accepted" : "Request Declined"),
@@ -203,8 +184,8 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
         ),
         backgroundColor: const Color(0xFF1565C0),
         elevation: 0,
-        actions: const [
-          NotificationIconButton(),
+        actions: [
+          IconButton(onPressed: () {}, icon: const Icon(Icons.notifications)),
         ],
       ),
       body: SingleChildScrollView(
@@ -349,7 +330,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
               child: ListTile(
                 leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), shape: BoxShape.circle), child: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFC62828))),
                 title: const Text("Patient MRI reports", style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text("View MRI reports shared by your patients"),
+                subtitle: const Text("Live summaries from Firebase (PDF stays on patient device)"),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (c) => const DoctorMriReportsScreen()));

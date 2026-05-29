@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'doctor_profile_screen.dart';
+import 'consult_doctor_screen.dart';
 
 // Colors
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -40,19 +40,13 @@ class AllDoctorsScreen extends StatelessWidget {
 
           var docs = snapshot.data!.docs;
 
-          // ✅ SORTING LOGIC: Rating ke hisab se (Highest First), aur "New" doctors properly sort honge
+          // ✅ SORTING LOGIC: Rating ke hisab se (Highest First)
           List<DocumentSnapshot> sortedDocs = List.from(docs);
           sortedDocs.sort((a, b) {
             var dataA = a.data() as Map<String, dynamic>;
             var dataB = b.data() as Map<String, dynamic>;
-
-            int reviewsA = dataA['totalReviews'] ?? 0;
-            int reviewsB = dataB['totalReviews'] ?? 0;
-
-            // Agar reviews 0 hain to sorting ke liye effective rating 0 consider karein, taake wo niche aayen
-            double ratingA = reviewsA == 0 ? 0.0 : (dataA['rating'] ?? 0.0).toDouble();
-            double ratingB = reviewsB == 0 ? 0.0 : (dataB['rating'] ?? 0.0).toDouble();
-
+            double ratingA = (dataA['rating'] ?? 0.0).toDouble();
+            double ratingB = (dataB['rating'] ?? 0.0).toDouble();
             return ratingB.compareTo(ratingA); // Descending order
           });
 
@@ -72,7 +66,10 @@ class AllDoctorsScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => DoctorProfilePage(doctorId: docId),
+                      builder: (context) => ConsultDoctorPage(
+                        doctorId: docId,
+                        doctorName: data['name'] ?? 'Doctor',
+                      ),
                     ),
                   );
                 },
@@ -96,6 +93,7 @@ class AllDoctorsScreen extends StatelessWidget {
                         const CircleAvatar(
                           radius: 30,
                           backgroundColor: kAccentColor,
+                          backgroundImage: AssetImage('assets/images/doctor1.png'),
                           child: Icon(Icons.person, color: kPrimaryColor),
                         ),
                         const SizedBox(width: 15),

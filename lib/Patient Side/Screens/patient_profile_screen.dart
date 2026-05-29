@@ -1,144 +1,82 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../Auth/patient_login_page.dart';
 
+// --- THEME COLORS ---
 const Color kPrimaryColor = Color(0xFF1565C0);
 const Color kAccentColor = Color(0xFFE3F2FD);
 const Color kTextDark = Color(0xFF37474F);
 const Color kTextLight = Color(0xFF78909C);
 
+// 1. VIEW PROFILE PAGE
 class ProfileDisplayPage extends StatefulWidget {
   const ProfileDisplayPage({super.key});
-  @override
-  State<ProfileDisplayPage> createState() => _ProfileDisplayPageState();
+  @override State<ProfileDisplayPage> createState() => _ProfileDisplayPageState();
 }
 
 class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
-  Map<String, dynamic> _data = {};
+  String name="Loading...", email="", phone="", gender="", address="", bloodGroup="", dob="", emergency="", medicalConditions="";
   File? profileImage;
-  bool _loading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  @override void initState() { super.initState(); _loadDisplayData(); }
 
-  Future<void> _load() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+  Future<void> _loadDisplayData() async {
     final prefs = await SharedPreferences.getInstance();
-    String? path = prefs.getString('imagePath');
-    if (path != null && File(path).existsSync()) {
-      profileImage = File(path);
-    }
-
-    if (uid != null) {
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      if (doc.exists) _data = doc.data() ?? {};
-    }
-
-    if (_data.isEmpty) {
-      _data = {
-        'name': prefs.getString('name') ?? 'Patient',
-        'email': prefs.getString('email') ?? '',
-        'phone': prefs.getString('phone') ?? '',
-        'dob': prefs.getString('dob') ?? '',
-        'gender': prefs.getString('gender') ?? '',
-        'address': prefs.getString('address') ?? '',
-        'bloodGroup': prefs.getString('bloodGroup') ?? '',
-        'emergency': prefs.getString('emergency') ?? '',
-        'conditions': prefs.getString('conditions') ?? '',
-      };
-    }
-
-    if (mounted) setState(() => _loading = false);
+    setState(() {
+      name = prefs.getString('name') ?? "Anas Ahmed";
+      email = prefs.getString('email') ?? "anas.ahmed@example.com";
+      phone = prefs.getString('phone') ?? "+92 300 1234567";
+      gender = prefs.getString('gender') ?? "Male";
+      address = prefs.getString('address') ?? "Taxila, Pakistan";
+      bloodGroup = prefs.getString('bloodGroup') ?? "B+";
+      dob = prefs.getString('dob') ?? "01/01/1980";
+      emergency = prefs.getString('emergency') ?? "+92 321 7654321";
+      medicalConditions = prefs.getString('conditions') ?? "None";
+      String? path = prefs.getString('imagePath');
+      if (path != null) profileImage = File(path);
+    });
   }
-
-  String _v(String k) => (_data[k] ?? '—').toString();
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('My Profile'),
+        title: const Text("My Profile"),
         backgroundColor: kPrimaryColor,
         elevation: 0,
-        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.white),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PatientProfilePage()),
-              );
-              _load();
-            },
+            onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PatientProfilePage())),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(25),
-          child: Column(
-            children: [
-              CircleAvatar(
-                radius: 55,
-                backgroundImage:
-                    profileImage != null ? FileImage(profileImage!) : null,
-                backgroundColor: kAccentColor,
-                child: profileImage == null
-                    ? const Icon(Icons.person, size: 60, color: kPrimaryColor)
-                    : null,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          children: [
+            Center(
+              child: CircleAvatar(
+                  radius: 55,
+                  backgroundImage: profileImage != null ? FileImage(profileImage!) : null,
+                  backgroundColor: kAccentColor,
+                  child: profileImage == null ? const Icon(Icons.person, size: 60, color: kPrimaryColor) : null
               ),
-              const SizedBox(height: 15),
-              Text(_v('name'),
-                  style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: kTextDark)),
-              Text(_v('email'), style: const TextStyle(color: kTextLight)),
-              const SizedBox(height: 30),
-              _infoTile(Icons.calendar_today, 'Date of Birth', _v('dob')),
-              _infoTile(Icons.person_outline, 'Gender', _v('gender')),
-              _infoTile(Icons.water_drop, 'Blood Group', _v('bloodGroup')),
-              _infoTile(Icons.phone_android, 'Phone', _v('phone')),
-              _infoTile(Icons.phone_in_talk, 'Emergency Contact', _v('emergency')),
-              _infoTile(Icons.location_on, 'Address', _v('address')),
-              _infoTile(
-                  Icons.medical_services, 'Medical Conditions', _v('conditions')),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const PatientProfilePage()),
-                    );
-                    _load();
-                  },
-                  icon: const Icon(Icons.settings, color: kPrimaryColor),
-                  label: const Text('Manage Account',
-                      style: TextStyle(
-                          color: kPrimaryColor, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 15),
+            Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kTextDark)),
+            Text(email, style: const TextStyle(color: kTextLight)),
+            const SizedBox(height: 30),
+            _infoTile(Icons.calendar_today, "Date of Birth", dob),
+            _infoTile(Icons.person_outline, "Gender", gender),
+            _infoTile(Icons.water_drop, "Blood Group", bloodGroup),
+            _infoTile(Icons.phone_android, "Phone", phone),
+            _infoTile(Icons.phone_in_talk, "Emergency Contact", emergency),
+            _infoTile(Icons.location_on, "Address", address),
+            _infoTile(Icons.medical_services, "Medical Conditions", medicalConditions),
+          ],
         ),
       ),
     );
@@ -148,9 +86,7 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-          color: const Color(0xFFF5F7FA),
-          borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: const Color(0xFFF5F7FA), borderRadius: BorderRadius.circular(10)),
       child: Row(
         children: [
           Icon(icon, color: kPrimaryColor, size: 22),
@@ -159,13 +95,8 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(fontSize: 12, color: kTextLight)),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: kTextDark)),
+                Text(title, style: const TextStyle(fontSize: 12, color: kTextLight)),
+                Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: kTextDark)),
               ],
             ),
           )
@@ -175,29 +106,23 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
   }
 }
 
+// 2. EDIT PROFILE PAGE
 class PatientProfilePage extends StatefulWidget {
   const PatientProfilePage({super.key});
-  @override
-  State<PatientProfilePage> createState() => _PatientProfilePageState();
+  @override State<PatientProfilePage> createState() => _PatientProfilePageState();
 }
 
 class _PatientProfilePageState extends State<PatientProfilePage> {
-  final nameC = TextEditingController();
-  final dobC = TextEditingController();
-  final phoneC = TextEditingController();
-  final emailC = TextEditingController();
-  final addressC = TextEditingController();
-  final emergencyC = TextEditingController();
-  final condC = TextEditingController();
-  final currentPassC = TextEditingController();
-  final newPassC = TextEditingController();
-  final confirmPassC = TextEditingController();
-
-  String bloodGroup = 'B+';
-  String gender = 'Male';
+  final TextEditingController nameC = TextEditingController();
+  final TextEditingController dobC = TextEditingController();
+  final TextEditingController phoneC = TextEditingController();
+  final TextEditingController emailC = TextEditingController();
+  final TextEditingController addressC = TextEditingController();
+  final TextEditingController emergencyC = TextEditingController();
+  final TextEditingController condC = TextEditingController();
+  String bloodGroup = "B+", gender = "Male";
   File? _profileImage;
   final ImagePicker _picker = ImagePicker();
-  bool _saving = false;
 
   @override
   void initState() {
@@ -207,374 +132,98 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    Map<String, dynamic> data = {};
-
-    if (uid != null) {
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      if (doc.exists) data = doc.data() ?? {};
-    }
-
-    nameC.text = data['name'] ?? prefs.getString('name') ?? '';
-    dobC.text = data['dob'] ?? prefs.getString('dob') ?? '';
-    phoneC.text = data['phone'] ?? prefs.getString('phone') ?? '';
-    emailC.text = data['email'] ??
-        prefs.getString('email') ??
-        FirebaseAuth.instance.currentUser?.email ??
-        '';
-    addressC.text = data['address'] ?? prefs.getString('address') ?? '';
-    emergencyC.text = data['emergency'] ?? prefs.getString('emergency') ?? '';
-    condC.text =
-        data['conditions'] ?? prefs.getString('conditions') ?? '';
-    gender = data['gender'] ?? prefs.getString('gender') ?? 'Male';
-    bloodGroup =
-        data['bloodGroup'] ?? prefs.getString('bloodGroup') ?? 'B+';
-    final path = prefs.getString('imagePath');
-    if (path != null && File(path).existsSync()) {
-      _profileImage = File(path);
-    }
-    if (mounted) setState(() {});
+    nameC.text = prefs.getString('name') ?? "Anas Ahmed";
+    dobC.text = prefs.getString('dob') ?? "01/01/1980";
+    phoneC.text = prefs.getString('phone') ?? "+92 300 1234567";
+    emailC.text = prefs.getString('email') ?? "anas.ahmed@example.com";
+    addressC.text = prefs.getString('address') ?? "Taxila, Pakistan";
+    emergencyC.text = prefs.getString('emergency') ?? "+92 321 7654321";
+    condC.text = prefs.getString('conditions') ?? "None";
+    setState(() {
+      gender = prefs.getString('gender') ?? "Male";
+      bloodGroup = prefs.getString('bloodGroup') ?? "B+";
+      String? path = prefs.getString('imagePath');
+      if (path != null) _profileImage = File(path);
+    });
   }
 
   Future<void> _saveData() async {
-    setState(() => _saving = true);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('name', nameC.text);
+    await prefs.setString('dob', dobC.text);
+    await prefs.setString('phone', phoneC.text);
+    await prefs.setString('email', emailC.text);
+    await prefs.setString('address', addressC.text);
+    await prefs.setString('emergency', emergencyC.text);
+    await prefs.setString('conditions', condC.text);
+    await prefs.setString('gender', gender);
+    await prefs.setString('bloodGroup', bloodGroup);
+    if (_profileImage != null) await prefs.setString('imagePath', _profileImage!.path);
 
-      await prefs.setString('name', nameC.text);
-      await prefs.setString('dob', dobC.text);
-      await prefs.setString('phone', phoneC.text);
-      await prefs.setString('email', emailC.text);
-      await prefs.setString('address', addressC.text);
-      await prefs.setString('emergency', emergencyC.text);
-      await prefs.setString('conditions', condC.text);
-      await prefs.setString('gender', gender);
-      await prefs.setString('bloodGroup', bloodGroup);
-      if (_profileImage != null) {
-        await prefs.setString('imagePath', _profileImage!.path);
-      }
-
-      if (uid != null) {
-        await FirebaseFirestore.instance.collection('users').doc(uid).set({
-          'name': nameC.text.trim(),
-          'email': emailC.text.trim(),
-          'phone': phoneC.text.trim(),
-          'dob': dobC.text.trim(),
-          'address': addressC.text.trim(),
-          'emergency': emergencyC.text.trim(),
-          'conditions': condC.text.trim(),
-          'gender': gender,
-          'bloodGroup': bloodGroup,
-          if (_profileImage != null) 'profileImagePath': _profileImage!.path,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        await FirebaseAuth.instance.currentUser
-            ?.updateDisplayName(nameC.text.trim());
-      }
-
-      if (!mounted) return;
-      Navigator.pop(context, true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Account updated successfully'),
-            backgroundColor: Colors.green),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _changePassword() async {
-    if (newPassC.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Password must be at least 6 characters'),
-            backgroundColor: Colors.red),
-      );
-      return;
-    }
-    if (newPassC.text != confirmPassC.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Passwords do not match'), backgroundColor: Colors.red),
-      );
-      return;
-    }
-    try {
-      final user = FirebaseAuth.instance.currentUser!;
-      final cred = EmailAuthProvider.credential(
-        email: user.email!,
-        password: currentPassC.text,
-      );
-      await user.reauthenticateWithCredential(cred);
-      await user.updatePassword(newPassC.text);
-      currentPassC.clear();
-      newPassC.clear();
-      confirmPassC.clear();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Password changed successfully'),
-              backgroundColor: Colors.green),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.message ?? 'Could not change password'),
-              backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  void _handleDeleteAccount() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Account?',
-            style: TextStyle(color: Colors.red)),
-        content: const Text(
-          'This will permanently delete your profile, lab reports, and account data. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                final user = FirebaseAuth.instance.currentUser;
-                if (user == null) return;
-                final uid = user.uid;
-
-                final reports = await FirebaseFirestore.instance
-                    .collection('mri_reports')
-                    .where('patientUid', isEqualTo: uid)
-                    .get();
-                final batch = FirebaseFirestore.instance.batch();
-                for (final doc in reports.docs) {
-                  batch.delete(doc.reference);
-                }
-                await batch.commit();
-
-                await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(uid)
-                    .delete();
-                await user.delete();
-
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.clear();
-
-                if (!context.mounted) return;
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => const LoginScreen()),
-                  (_) => false,
-                );
-              } on FirebaseAuthException catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      e.code == 'requires-recent-login'
-                          ? 'Please sign in again, then retry account deletion.'
-                          : (e.message ?? 'Could not delete account'),
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              } catch (e) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Could not delete account: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+    if (!mounted) return;
+    Navigator.pop(context); // Go back to Display Page or Dashboard
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account Updated"), backgroundColor: Colors.green));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Account'),
-        backgroundColor: kPrimaryColor,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: const Text("Manage Account"), backgroundColor: kPrimaryColor),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
           Center(
             child: GestureDetector(
               onTap: () async {
-                final i = await _picker.pickImage(source: ImageSource.gallery);
+                final XFile? i = await _picker.pickImage(source: ImageSource.gallery);
                 if (i != null) setState(() => _profileImage = File(i.path));
               },
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundImage: _profileImage != null
-                        ? FileImage(_profileImage!)
-                        : null,
-                    backgroundColor: Colors.grey[300],
-                    child: _profileImage == null
-                        ? const Icon(Icons.camera_alt, color: Colors.grey)
-                        : null,
-                  ),
-                  const Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: kPrimaryColor,
-                      child: Icon(Icons.edit, size: 14, color: Colors.white),
-                    ),
-                  ),
-                ],
+              child: CircleAvatar(
+                  radius: 50,
+                  backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                  backgroundColor: Colors.grey[300],
+                  child: _profileImage == null ? const Icon(Icons.camera_alt, color: Colors.grey) : null
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          const Center(
-              child: Text('Tap to change photo',
-                  style: TextStyle(color: Colors.grey, fontSize: 12))),
-          const SizedBox(height: 24),
-          const Text('Personal Details',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16, color: kTextDark)),
-          const SizedBox(height: 12),
-          _buildEditField('Full Name', nameC),
-          _buildEditField('Email Address', emailC),
-          _buildEditField('Phone Number', phoneC),
-          _buildEditField('Date of Birth', dobC),
-          _buildEditField('Address', addressC),
-          _buildEditField('Emergency Contact', emergencyC),
-          const SizedBox(height: 8),
-          const Text('Medical Information',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16, color: kTextDark)),
-          const SizedBox(height: 12),
-          _buildEditField('Medical Conditions', condC),
-          const SizedBox(height: 16),
-          const Text('Change Password',
-              style: TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16, color: kTextDark)),
-          const SizedBox(height: 12),
-          _buildEditField('Current Password', currentPassC, obscure: true),
-          _buildEditField('New Password', newPassC, obscure: true),
-          _buildEditField('Confirm Password', confirmPassC, obscure: true),
-          const SizedBox(height: 8),
-          OutlinedButton(
-            onPressed: _changePassword,
-            child: const Text('Update Password'),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 10),
+          const Center(child: Text("Tap to change photo", style: TextStyle(color: Colors.grey, fontSize: 12))),
+          const SizedBox(height: 25),
+
+          _buildEditField("Full Name", nameC),
+          _buildEditField("Email Address", emailC),
+          _buildEditField("Phone Number", phoneC),
+          _buildEditField("Date of Birth", dobC),
+          _buildEditField("Address", addressC),
+          _buildEditField("Emergency Contact", emergencyC),
+          _buildEditField("Medical Conditions", condC),
+
+          const SizedBox(height: 20),
           SizedBox(
             height: 50,
             child: ElevatedButton(
-              onPressed: _saving ? null : _saveData,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimaryColor,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: _saving
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text('Save Changes',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+              onPressed: _saveData,
+              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              child: const Text("Save Changes", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
-          ),
-          const SizedBox(height: 32),
-          const Divider(),
-          const SizedBox(height: 8),
-          const Text(
-            'Danger zone',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Colors.red,
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: OutlinedButton(
-              onPressed: _handleDeleteAccount,
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Colors.red),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-              ),
-              child: const Text(
-                'Delete Account',
-                style: TextStyle(
-                    color: Colors.red, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
+          )
         ],
       ),
     );
   }
 
-  Widget _buildEditField(String label, TextEditingController controller,
-      {bool obscure = false}) {
+  Widget _buildEditField(String label, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: TextField(
         controller: controller,
-        obscureText: obscure,
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: kTextLight),
-          filled: true,
-          fillColor: Colors.white,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          focusedBorder: const OutlineInputBorder(
-            borderSide: BorderSide(color: kPrimaryColor, width: 2),
-          ),
+          focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: kPrimaryColor, width: 2)),
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    nameC.dispose();
-    dobC.dispose();
-    phoneC.dispose();
-    emailC.dispose();
-    addressC.dispose();
-    emergencyC.dispose();
-    condC.dispose();
-    currentPassC.dispose();
-    newPassC.dispose();
-    confirmPassC.dispose();
-    super.dispose();
   }
 }

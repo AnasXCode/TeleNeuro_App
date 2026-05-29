@@ -14,9 +14,7 @@ void main() async {
   };
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   } catch (e, st) {
     debugPrint('Firebase.initializeApp failed: $e');
     debugPrint('$st');

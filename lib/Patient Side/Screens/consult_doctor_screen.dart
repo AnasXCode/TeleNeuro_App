@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/notification_service.dart';
-import 'doctor_profile_screen.dart';
 
 class ConsultDoctorPage extends StatefulWidget {
   // ✅ 1. Yahan humne parameters add kiye taake Dashboard se Data le sakein
@@ -143,7 +141,8 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         patientName = userDoc['name'] ?? "Patient";
       }
 
-      final aptRef = await FirebaseFirestore.instance.collection('appointments').add({
+      // Firestore mein Save karna
+      await FirebaseFirestore.instance.collection('appointments').add({
         'patientId': user.uid,
         'patientName': patientName,
         'doctorId': widget.doctorId,
@@ -152,18 +151,9 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         'date':
         "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}",
         'time': _selectedTime!.format(context),
-        'status': 'Pending',
+        'status': 'Pending', // Shuru mein Pending rahega
         'timestamp': FieldValue.serverTimestamp(),
-        'patientUnread': 0,
-        'doctorUnread': 0,
       });
-
-      await NotificationService.appointmentRequest(
-        doctorId: widget.doctorId,
-        patientName: patientName,
-        appointmentId: aptRef.id,
-        patientId: user.uid,
-      );
 
       if (!mounted) return;
 
@@ -199,18 +189,7 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DoctorProfilePage(doctorId: widget.doctorId),
-                ),
-              ),
-              icon: Icon(Icons.person, color: kPrimaryColor),
-              label: Text('View Dr. ${widget.doctorName}\'s profile',
-                  style: TextStyle(color: kPrimaryColor, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 12),
+            // Header Text
             Text(
               "Consultation Details",
               style: TextStyle(
@@ -307,7 +286,6 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                 onPressed: _isLoading ? null : _bookAppointment,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
-                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -315,9 +293,7 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text("Book Appointment",
                     style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                        fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
           ],

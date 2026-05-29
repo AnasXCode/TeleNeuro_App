@@ -10,7 +10,7 @@ import '../Auth/patient_portal.dart';
 // --- SCREENS IMPORTS ---
 import 'appointments_screen.dart';
 import 'chat_screen.dart';
-import 'doctor_profile_screen.dart';
+import 'consult_doctor_screen.dart';
 import 'patient_profile_screen.dart';
 import 'reports_screen.dart';
 import 'all_doctors_screen.dart';
@@ -18,9 +18,6 @@ import 'mri_upload_screen.dart';
 
 // --- WIDGETS ---
 import '../Widgets/category_card.dart';
-import '../../widgets/notification_icon_button.dart';
-import '../../widgets/patient_profile_menu.dart';
-import '../../widgets/appointment_status_listener.dart';
 
 // GLOBAL COLORS
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -111,9 +108,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F7FA),
-        body: SafeArea(
-          child: AppointmentStatusListener(child: bodyContent),
-        ),
+        body: SafeArea(child: bodyContent),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() => _selectedIndex = index),
@@ -138,31 +133,18 @@ class _PatientDashboardState extends State<PatientDashboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Hello, $_userName', style: const TextStyle(fontSize: 16, color: kTextLight)),
-                    const Text('Find your Specialist', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kTextDark)),
-                  ],
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Hello, $_userName', style: const TextStyle(fontSize: 16, color: kTextLight)),
+                  const Text('Find your Specialist', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kTextDark)),
+                ],
               ),
-              const NotificationIconButton(iconColor: kPrimaryColor),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => showPatientProfileMenu(
-                  context,
-                  onUpdated: () {
-                    _loadDashboardImage();
-                    _fetchUserName();
-                  },
-                ),
-                child: CircleAvatar(
-                  radius: 20,
-                  backgroundColor: kAccentColor,
-                  backgroundImage: _dashboardProfileImage != null ? FileImage(_dashboardProfileImage!) : null,
-                  child: _dashboardProfileImage == null ? const Icon(Icons.person, color: kPrimaryColor) : null,
-                ),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: kAccentColor,
+                backgroundImage: _dashboardProfileImage != null ? FileImage(_dashboardProfileImage!) : null,
+                child: _dashboardProfileImage == null ? const Icon(Icons.person, color: kPrimaryColor) : null,
               ),
             ],
           ),
@@ -182,37 +164,103 @@ class _PatientDashboardState extends State<PatientDashboard> {
           _buildBanner(context),
           const SizedBox(height: 25),
 
-          if (_searchQuery.trim().isNotEmpty) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Search Results (${_searchQuery.trim()})',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kTextDark),
-                ),
-                GestureDetector(
-                  onTap: () => setState(() => _searchQuery = ''),
-                  child: const Text('Clear', style: TextStyle(color: kPrimaryColor, fontWeight: FontWeight.bold)),
-                ),
-              ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Top Specialists', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kTextDark)),
+              GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDoctorsScreen())), child: const Text("See All", style: TextStyle(color: kPrimaryColor, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          SizedBox(
+            height: 180,
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'Doctor').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                if (snapshot.hasError) return const Center(child: Text("Unable to load"));
+                if (!snapshot.hasData || snapshot.data == null) return const Center(child: Text("No data found"));
+
+                final docs = snapshot.data!.docs;
+                if (docs.isEmpty) return const Center(child: Text("No specialists registered yet."));
+
+                // ✅ 1. FILTERING LOGIC: Sirf 4.0 ya us se zyada rating wale doctors
+                var topRatedDocs = docs.where((doc) {
+                  var data = doc.data() as Map<String, dynamic>?;
+                  if (data == null) return false;
+                  double rating = (data['rating'] ?? 0.0).toDouble();
+                  return rating >= 4.0; // New doctors automatically nikal jayenge
+                }).toList();
+
+                // ✅ 2. SORTING LOGIC: Highest Rating Doctors First
+                topRatedDocs.sort((a, b) {
+                  var dataA = a.data() as Map<String, dynamic>;
+                  var dataB = b.data() as Map<String, dynamic>;
+                  double ratingA = (dataA['rating'] ?? 0.0).toDouble();
+                  double ratingB = (dataB['rating'] ?? 0.0).toDouble();
+                  return ratingB.compareTo(ratingA); // Descending order
+                });
+
+                // ✅ 3. SEARCH & LIMIT: Search apply karein aur sirf top 5 dikhayein
+                final displayList = topRatedDocs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>?;
+                  if (data == null) return false;
+                  final name = (data['name'] ?? '').toString().toLowerCase();
+                  return name.contains(_searchQuery.toLowerCase());
+                }).take(5).toList(); // Sirf Top 5 doctors yahan se filter honge
+
+                if (displayList.isEmpty) return const Center(child: Text("More top rated doctors joining soon!", style: TextStyle(color: Colors.grey)));
+
+                return ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: displayList.length, // Ab displayList use ho rahi hai
+                  itemBuilder: (context, index) {
+                    final doc = displayList[index];
+                    final data = doc.data() as Map<String, dynamic>?;
+                    final docId = doc.id;
+
+                    String name = (data?['name'] ?? 'Unknown Doctor').toString();
+                    String speciality = (data?['speciality'] ?? 'General Physician').toString();
+
+                    // ✅ RATING DISPLAY LOGIC
+                    int totalReviews = data?['totalReviews'] ?? 0;
+                    String ratingDisplay = totalReviews == 0 ? "New" : (data?['rating'] ?? 0.0).toString();
+
+                    return GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ConsultDoctorPage(doctorId: docId, doctorName: name))),
+                      child: Container(
+                        width: 150,
+                        margin: const EdgeInsets.only(right: 15, bottom: 5, top: 5),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5, offset: const Offset(0, 3))]),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const CircleAvatar(radius: 35, backgroundColor: kAccentColor, backgroundImage: AssetImage('assets/images/doctor1.png'), child: Icon(Icons.person, size: 35, color: kPrimaryColor)),
+                            const SizedBox(height: 10),
+                            Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: kTextDark)),
+                            const SizedBox(height: 4),
+                            Text(speciality, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: kTextLight)),
+                            const SizedBox(height: 8),
+                            Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.star, color: Colors.amber, size: 14),
+                                  Text(" $ratingDisplay", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: kTextDark))
+                                ]
+                            )
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
-            const SizedBox(height: 10),
-            _buildAllDoctorsList(filterQuery: _searchQuery.trim(), maxHeight: 320),
-            const SizedBox(height: 20),
-          ] else ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Top Specialists', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kTextDark)),
-                GestureDetector(onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDoctorsScreen())), child: const Text("See All", style: TextStyle(color: kPrimaryColor, fontWeight: FontWeight.bold))),
-              ],
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 180,
-              child: _buildTopSpecialistsRow(),
-            ),
-          ],
+          ),
           const SizedBox(height: 25),
           const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: kTextDark)),
           const SizedBox(height: 15),
@@ -233,216 +281,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
           ),
           const SizedBox(height: 20),
         ],
-      ),
-    );
-  }
-
-  bool _matchesDoctorSearch(Map<String, dynamic> data, String query) {
-    final q = query.toLowerCase();
-    final name = (data['name'] ?? '').toString().toLowerCase();
-    final spec = (data['speciality'] ?? '').toString().toLowerCase();
-    final hospital = (data['hospital'] ?? '').toString().toLowerCase();
-    return name.contains(q) || spec.contains(q) || hospital.contains(q);
-  }
-
-  Widget _buildTopSpecialistsRow() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'Doctor').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No specialists registered yet.'));
-        }
-
-        var topRatedDocs = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          final totalReviews = data['totalReviews'] ?? 0;
-          final rating = (data['rating'] ?? 0.0).toDouble();
-          return totalReviews > 0 && rating >= 4.0;
-        }).toList();
-
-        topRatedDocs.sort((a, b) {
-          final dataA = a.data() as Map<String, dynamic>;
-          final dataB = b.data() as Map<String, dynamic>;
-          return ((dataB['rating'] ?? 0.0) as num)
-              .compareTo((dataA['rating'] ?? 0.0) as num);
-        });
-
-        final displayList = topRatedDocs.take(5).toList();
-        if (displayList.isEmpty) {
-          return const Center(
-              child: Text('More top rated doctors joining soon!',
-                  style: TextStyle(color: Colors.grey)));
-        }
-
-        return ListView.builder(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          itemCount: displayList.length,
-          itemBuilder: (context, index) =>
-              _doctorCard(displayList[index], horizontal: true),
-        );
-      },
-    );
-  }
-
-  Widget _buildAllDoctorsList({required String filterQuery, double? maxHeight}) {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'Doctor').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator()));
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Text('No doctors available.', style: TextStyle(color: Colors.grey));
-        }
-
-        final matched = snapshot.data!.docs.where((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return _matchesDoctorSearch(data, filterQuery);
-        }).toList();
-
-        matched.sort((a, b) {
-          final dataA = a.data() as Map<String, dynamic>;
-          final dataB = b.data() as Map<String, dynamic>;
-          final reviewsA = dataA['totalReviews'] ?? 0;
-          final reviewsB = dataB['totalReviews'] ?? 0;
-          final ratingA = reviewsA == 0 ? 0.0 : (dataA['rating'] ?? 0.0).toDouble();
-          final ratingB = reviewsB == 0 ? 0.0 : (dataB['rating'] ?? 0.0).toDouble();
-          return ratingB.compareTo(ratingA);
-        });
-
-        if (matched.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: Text('No doctors match "$filterQuery".',
-                  style: const TextStyle(color: Colors.grey)),
-            ),
-          );
-        }
-
-        return SizedBox(
-          height: maxHeight,
-          child: ListView.builder(
-            itemCount: matched.length,
-            itemBuilder: (context, index) => _doctorCard(matched[index]),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _doctorCard(DocumentSnapshot doc, {bool horizontal = false}) {
-    final data = doc.data() as Map<String, dynamic>;
-    final docId = doc.id;
-    final name = (data['name'] ?? 'Unknown Doctor').toString();
-    final speciality = (data['speciality'] ?? 'General Physician').toString();
-    final totalReviews = data['totalReviews'] ?? 0;
-    final ratingDisplay =
-        totalReviews == 0 ? 'New' : (data['rating'] ?? 0.0).toString();
-
-    if (horizontal) {
-      return GestureDetector(
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (c) => DoctorProfilePage(doctorId: docId))),
-        child: Container(
-          width: 150,
-          margin: const EdgeInsets.only(right: 15, bottom: 5, top: 5),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.grey.withOpacity(0.1),
-                    blurRadius: 5,
-                    offset: const Offset(0, 3))
-              ]),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircleAvatar(
-                  radius: 35,
-                  backgroundColor: kAccentColor,
-                  child: Icon(Icons.person, size: 35, color: kPrimaryColor)),
-              const SizedBox(height: 10),
-              Text(name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: kTextDark)),
-              const SizedBox(height: 4),
-              Text(speciality,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12, color: kTextLight)),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.star, color: Colors.amber, size: 14),
-                  Text(' $ratingDisplay',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: kTextDark))
-                ],
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (c) => DoctorProfilePage(doctorId: docId))),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.grey.withOpacity(0.08),
-                blurRadius: 4,
-                offset: const Offset(0, 2))
-          ],
-        ),
-        child: Row(
-          children: [
-            const CircleAvatar(
-                backgroundColor: kAccentColor,
-                child: Icon(Icons.person, color: kPrimaryColor)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, color: kTextDark)),
-                  Text(speciality, style: const TextStyle(color: kTextLight, fontSize: 13)),
-                ],
-              ),
-            ),
-            Row(
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 14),
-                Text(' $ratingDisplay',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right, color: kPrimaryColor),
-          ],
-        ),
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../services/notification_service.dart';
 // Ensure correct paths
 import '../Widgets/appointment_card.dart';
 import '../Widgets/request_card.dart';
@@ -21,34 +20,10 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
   // ✅ Status Update Function
   Future<void> _updateStatus(String docId, String newStatus) async {
     try {
-      final aptDoc = await FirebaseFirestore.instance
-          .collection('appointments')
-          .doc(docId)
-          .get();
-      final apt = aptDoc.data() ?? {};
-
       await FirebaseFirestore.instance
           .collection('appointments')
           .doc(docId)
           .update({'status': newStatus});
-
-      if (newStatus == 'Accepted' || newStatus == 'Declined') {
-        String doctorName = 'Doctor';
-        final doctorDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user!.uid)
-            .get();
-        if (doctorDoc.exists) {
-          doctorName = doctorDoc.data()?['name'] ?? 'Doctor';
-        }
-        await NotificationService.appointmentStatus(
-          patientId: (apt['patientId'] ?? '').toString(),
-          doctorName: doctorName,
-          status: newStatus == 'Accepted' ? 'approved' : 'declined',
-          appointmentId: docId,
-          doctorId: user!.uid,
-        );
-      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
