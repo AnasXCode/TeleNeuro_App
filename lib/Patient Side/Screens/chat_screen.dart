@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/active_chat_tracker.dart';
 import '../../services/notification_service.dart';
 import '../../services/chat_deletion_service.dart';
+import '../../services/appointment_chat_visibility.dart';
 import '../../Widgets/profile_view_screens.dart';
 import '../../Widgets/profile_avatar.dart';
 
@@ -60,6 +61,12 @@ class PatientChatScreen extends StatelessWidget {
   }
 
   void _openChat(BuildContext context, Map<String, dynamic> data, String docId) {
+    if (!AppointmentChatVisibility.isVisibleForPatient(data)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This conversation is no longer available.')),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -99,7 +106,7 @@ class PatientChatScreen extends StatelessWidget {
           // ✅ FILTERING: Sirf wo chats dikhao jo Patient ne delete NAHI ki hain
           var visibleDocs = allDocs.where((doc) {
             var data = doc.data() as Map<String, dynamic>;
-            return data['patientDeleted'] != true;
+            return AppointmentChatVisibility.isVisibleForPatient(data);
           }).toList();
 
           if (visibleDocs.isEmpty) {
@@ -411,6 +418,24 @@ class _ChatScreenState extends State<ChatScreen> {
           final doctorId = apptData?['doctorId'] ?? '';
           final isDoctor = currentUserId == doctorId;
           final isCompleted = status == 'Completed';
+
+          if (apptData != null) {
+            final available = isDoctor
+                ? AppointmentChatVisibility.isVisibleForDoctor(apptData)
+                : AppointmentChatVisibility.isVisibleForPatient(apptData);
+            if (!available) {
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'This conversation is no longer available.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ),
+              );
+            }
+          }
 
           return Column(
             children: [

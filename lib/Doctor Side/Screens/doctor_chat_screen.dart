@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../Patient Side/Screens/chat_screen.dart';
 import '../../services/notification_service.dart';
 import '../../services/chat_deletion_service.dart';
+import '../../services/appointment_chat_visibility.dart';
 import '../../Widgets/profile_view_screens.dart';
 import '../../Widgets/profile_avatar.dart';
 
@@ -104,6 +105,12 @@ class DoctorChatScreen extends StatelessWidget {
   }
 
   void _openChat(BuildContext context, Map<String, dynamic> data, String docId) {
+    if (!AppointmentChatVisibility.isVisibleForDoctor(data)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This conversation is no longer available.')),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -142,7 +149,7 @@ class DoctorChatScreen extends StatelessWidget {
 
           var visibleDocs = allDocs.where((doc) {
             var data = doc.data() as Map<String, dynamic>;
-            return data['doctorDeleted'] != true;
+            return AppointmentChatVisibility.isVisibleForDoctor(data);
           }).toList();
 
           if (visibleDocs.isEmpty) {

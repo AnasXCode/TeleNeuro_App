@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../Widgets/profile_view_screens.dart';
 import '../../Widgets/profile_avatar.dart';
+import '../../services/appointment_chat_visibility.dart';
 
 class MyPatientsScreen extends StatefulWidget {
   const MyPatientsScreen({super.key});
@@ -76,6 +77,7 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
 
           for (var doc in docs) {
             var data = doc.data() as Map<String, dynamic>;
+            if (AppointmentChatVisibility.isPeerAccountDeletedForDoctor(data)) continue;
             String patientId = data['patientId'] ?? 'unknown';
 
             // Agar patient pehle se list mein nahi hai, toh usko list mein daal do

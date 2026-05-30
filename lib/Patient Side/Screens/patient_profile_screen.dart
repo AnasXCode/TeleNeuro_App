@@ -6,7 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../services/user_profile_service.dart';
 import '../../services/profile_image_service.dart';
-import '../../services/account_deletion_service.dart';
 import '../../Widgets/profile_avatar.dart';
 import '../../Widgets/account_delete_dialog.dart';
 import '../Auth/patient_portal.dart';
@@ -120,23 +119,9 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
   }
 
   Future<void> _handleDeleteAccount(BuildContext context) async {
-    final confirmed = await confirmAccountDeletion(context);
-    if (!confirmed || !context.mounted) return;
-
-    final error = await AccountDeletionService.deleteCurrentAccount();
-    if (!context.mounted) return;
-
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (_) => const PatientPortalScreen()),
-      (_) => false,
+    await performAccountDeletion(
+      context: context,
+      destination: const PatientPortalScreen(),
     );
   }
 

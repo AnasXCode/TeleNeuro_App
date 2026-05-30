@@ -8,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import '../Auth/doctor_login_page.dart';
 import '../../Widgets/profile_avatar.dart';
 import '../../Widgets/account_delete_dialog.dart';
-import '../../services/account_deletion_service.dart';
 import '../../services/profile_image_service.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
@@ -165,24 +164,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     }
   }
 
-  void _handleDeleteAccount(BuildContext context) async {
-    final confirmed = await confirmAccountDeletion(context);
-    if (!confirmed || !context.mounted) return;
-
-    final error = await AccountDeletionService.deleteCurrentAccount();
-    if (!context.mounted) return;
-
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const DoctorLoginScreen()),
-      (route) => false,
+  void _handleDeleteAccount(BuildContext context) {
+    performAccountDeletion(
+      context: context,
+      destination: const DoctorLoginScreen(),
     );
   }
 
