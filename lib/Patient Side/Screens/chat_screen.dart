@@ -185,6 +185,13 @@ class _ChatScreenState extends State<ChatScreen> {
       widget.appointmentId,
       userId: _auth.currentUser?.uid,
     );
+    final uid = _auth.currentUser?.uid;
+    if (uid != null && widget.appointmentId.isNotEmpty) {
+      NotificationService.markAppointmentNotificationsAsRead(
+        userId: uid,
+        appointmentId: widget.appointmentId,
+      );
+    }
   }
 
   @override
@@ -217,26 +224,26 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<bool> _isRecipientAvailable(String recipientId, Map<String, dynamic>? apptData) async {
+    if (recipientId.isEmpty) return false;
+    final currentUserId = _auth.currentUser?.uid ?? '';
+    if (apptData != null && AppointmentChatVisibility.isPeerDeletedForUser(apptData, currentUserId)) {
+      return false;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(recipientId).get();
+      return doc.exists;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
     if (widget.appointmentId.isEmpty) return;
 
     String msg = _messageController.text.trim();
-    _messageController.clear();
-
     String currentUserId = _auth.currentUser!.uid;
-
-    final messageRef = await FirebaseFirestore.instance
-        .collection('chat_rooms')
-        .doc(widget.appointmentId)
-        .collection('messages')
-        .add({
-      "senderId": currentUserId,
-      "receiverId": widget.receiverId,
-      "message": msg,
-      "time": FieldValue.serverTimestamp(),
-      "isRead": false,
-    });
 
     final apptDoc = await FirebaseFirestore.instance
         .collection('appointments')
@@ -259,6 +266,29 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
+    if (!await _isRecipientAvailable(recipientId, apptData)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This user is no longer available.')),
+        );
+      }
+      return;
+    }
+
+    _messageController.clear();
+
+    final messageRef = await FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .doc(widget.appointmentId)
+        .collection('messages')
+        .add({
+      "senderId": currentUserId,
+      "receiverId": widget.receiverId,
+      "message": msg,
+      "time": FieldValue.serverTimestamp(),
+      "isRead": false,
+    });
+
     if (recipientId.isEmpty) return;
 
     await NotificationService.notifyChatMessage(
@@ -268,6 +298,26 @@ class _ChatScreenState extends State<ChatScreen> {
       appointmentId: widget.appointmentId,
       messageId: messageRef.id,
       messagePreview: msg,
+    );
+  }
+
+  Widget _unavailableBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.orange.shade50,
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: Colors.orange.shade800, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'This account has been deleted. You can view past messages but cannot send new ones.',
+              style: TextStyle(color: Colors.orange.shade900, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -419,96 +469,115 @@ class _ChatScreenState extends State<ChatScreen> {
           final isDoctor = currentUserId == doctorId;
           final isCompleted = status == 'Completed';
 
-          if (apptData != null) {
-            final available = isDoctor
-                ? AppointmentChatVisibility.isVisibleForDoctor(apptData)
-                : AppointmentChatVisibility.isVisibleForPatient(apptData);
-            if (!available) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text(
-                    'This conversation is no longer available.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                ),
-              );
-            }
-          }
-
-          return Column(
-            children: [
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('chat_rooms')
-                      .doc(widget.appointmentId)
-                      .collection('messages')
-                      .orderBy('time', descending: true)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    final docs = snapshot.data?.docs ?? [];
-                    if (docs.isEmpty && !isCompleted) {
-                      return const Center(child: Text("Say Hello! 👋"));
-                    }
-
-                    final itemCount = docs.length + (isCompleted ? 1 : 0);
-
-                    return ListView.builder(
-                      reverse: true,
-                      padding: const EdgeInsets.only(bottom: 8, top: 8),
-                      itemCount: itemCount,
-                      itemBuilder: (context, index) {
-                        if (isCompleted && index == docs.length) {
-                          return _systemMessageBubble(
-                            isDoctor
-                                ? 'This consultation has been marked as completed.'
-                                : 'This consultation has ended. Book a new appointment to chat again.',
-                          );
-                        }
-
-                        var doc = docs[index];
-                        var data = doc.data() as Map<String, dynamic>;
-
-                        if (data['type'] == 'system') {
-                          return _systemMessageBubble(
-                            (data['message'] ?? '').toString(),
-                          );
-                        }
-
-                        bool isMe = data['senderId'] == currentUserId;
-                        if (!isMe) _markMessageAsRead(doc);
-
-                        return _chatMessageBubble(data, isMe);
-                      },
-                    );
-                  },
+          final unavailableToSelf = apptData != null &&
+              (isDoctor
+                  ? !AppointmentChatVisibility.isVisibleForDoctor(apptData)
+                  : !AppointmentChatVisibility.isVisibleForPatient(apptData));
+          if (unavailableToSelf) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'This conversation is no longer available.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
                 ),
               ),
-              if (!isCompleted)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _messageController,
-                          decoration: const InputDecoration(
-                            hintText: "Type a message...",
-                            border: OutlineInputBorder(),
-                          ),
-                          onSubmitted: (_) => sendMessage(),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.send, color: Color(0xFF1565C0)),
-                        onPressed: sendMessage,
-                      ),
-                    ],
+            );
+          }
+
+          final peerId = apptData != null
+              ? AppointmentChatVisibility.peerUserId(apptData, currentUserId)
+              : widget.receiverId;
+          final peerDeletedFlag = apptData != null &&
+              AppointmentChatVisibility.isPeerDeletedForUser(apptData, currentUserId);
+
+          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: peerId != null && peerId.isNotEmpty
+                ? FirebaseFirestore.instance.collection('users').doc(peerId).snapshots()
+                : null,
+            builder: (context, peerSnap) {
+              final peerExists = peerId == null ||
+                  peerId.isEmpty ||
+                  (peerSnap.data?.exists ?? false);
+              final messagingBlocked =
+                  isCompleted || peerDeletedFlag || !peerExists;
+
+              return Column(
+                children: [
+                  if (messagingBlocked && !isCompleted) _unavailableBanner(),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('chat_rooms')
+                          .doc(widget.appointmentId)
+                          .collection('messages')
+                          .orderBy('time', descending: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final docs = snapshot.data?.docs ?? [];
+                        if (docs.isEmpty && !isCompleted && !messagingBlocked) {
+                          return const Center(child: Text("Say Hello! 👋"));
+                        }
+
+                        final itemCount = docs.length + (isCompleted ? 1 : 0);
+
+                        return ListView.builder(
+                          reverse: true,
+                          padding: const EdgeInsets.only(bottom: 8, top: 8),
+                          itemCount: itemCount,
+                          itemBuilder: (context, index) {
+                            if (isCompleted && index == docs.length) {
+                              return _systemMessageBubble(
+                                isDoctor
+                                    ? 'This consultation has been marked as completed.'
+                                    : 'This consultation has ended. Book a new appointment to chat again.',
+                              );
+                            }
+
+                            var doc = docs[index];
+                            var data = doc.data() as Map<String, dynamic>;
+
+                            if (data['type'] == 'system') {
+                              return _systemMessageBubble(
+                                (data['message'] ?? '').toString(),
+                              );
+                            }
+
+                            bool isMe = data['senderId'] == currentUserId;
+                            if (!isMe) _markMessageAsRead(doc);
+
+                            return _chatMessageBubble(data, isMe);
+                          },
+                        );
+                      },
+                    ),
                   ),
-                ),
-            ],
+                  if (!messagingBlocked)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _messageController,
+                              decoration: const InputDecoration(
+                                hintText: "Type a message...",
+                                border: OutlineInputBorder(),
+                              ),
+                              onSubmitted: (_) => sendMessage(),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.send, color: Color(0xFF1565C0)),
+                            onPressed: sendMessage,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
           );
         },
       ),

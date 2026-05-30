@@ -11,14 +11,27 @@ class AppointmentChatVisibility {
   }
 
   static bool isVisibleForPatient(Map<String, dynamic> data) {
-    if (data['patientDeleted'] == true) return false;
-    if (isPeerAccountDeletedForPatient(data)) return false;
-    return true;
+    return data['patientDeleted'] != true;
   }
 
   static bool isVisibleForDoctor(Map<String, dynamic> data) {
-    if (data['doctorDeleted'] == true) return false;
-    if (isPeerAccountDeletedForDoctor(data)) return false;
-    return true;
+    return data['doctorDeleted'] != true;
+  }
+
+  /// Whether the current user's chat peer has been marked deleted on the appointment.
+  static bool isPeerDeletedForUser(Map<String, dynamic> data, String currentUserId) {
+    final patientId = (data['patientId'] ?? '').toString();
+    final doctorId = (data['doctorId'] ?? '').toString();
+    if (currentUserId == patientId) return isPeerAccountDeletedForPatient(data);
+    if (currentUserId == doctorId) return isPeerAccountDeletedForDoctor(data);
+    return false;
+  }
+
+  static String? peerUserId(Map<String, dynamic> data, String currentUserId) {
+    final patientId = (data['patientId'] ?? '').toString();
+    final doctorId = (data['doctorId'] ?? '').toString();
+    if (currentUserId == patientId && doctorId.isNotEmpty) return doctorId;
+    if (currentUserId == doctorId && patientId.isNotEmpty) return patientId;
+    return null;
   }
 }

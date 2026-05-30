@@ -105,6 +105,14 @@ class NotificationService {
     // Do not skip on sender's device when sender is viewing the chat (previous bug).
     if (shouldSuppressChatNotification(appointmentId, recipientId)) return;
 
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(recipientId).get();
+      if (!userDoc.exists) return;
+    } catch (e) {
+      debugPrint('notifyChatMessage recipient check failed: $e');
+      return;
+    }
+
     final preview = messagePreview.length > 80
         ? '${messagePreview.substring(0, 80)}…'
         : messagePreview;
@@ -159,6 +167,81 @@ class NotificationService {
     } catch (e) {
       debugPrint('addChatSystemMessage failed: $e');
     }
+  }
+
+  static Stream<int> unreadCountStream(String userId) {
+    return notificationsStream(userId).map(
+      (snap) => snap.docs.where((d) => d.data()['read'] != true).length,
+    );
+  }
+
+  /// Unread chat-message notifications (badge on Chat tab).
+  static Stream<int> unreadChatCountStream(String userId) {
+    return notificationsStream(userId).map(
+      (snap) => snap.docs.where((d) {
+        final data = d.data();
+        return data['read'] != true && data['type'] == typeChatMessage;
+      }).length,
+    );
+  }
+
+  /// Unread non-chat notifications (badge on Notifications tab).
+  static Stream<int> unreadGeneralCountStream(String userId) {
+    return notificationsStream(userId).map(
+      (snap) => snap.docs.where((d) {
+        final data = d.data();
+        return data['read'] != true && data['type'] != typeChatMessage;
+      }).length,
+    );
+  }
+
+  static Future<void> markChatNotificationsAsRead(String userId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection(collection)
+        .where('recipientId', isEqualTo: userId)
+        .where('read', isEqualTo: false)
+        .get();
+    final chatDocs = snap.docs.where((d) => d.data()['type'] == typeChatMessage);
+    if (chatDocs.isEmpty) return;
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in chatDocs) {
+      batch.update(doc.reference, {'read': true});
+    }
+    await batch.commit();
+  }
+
+  static Future<void> markGeneralNotificationsAsRead(String userId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection(collection)
+        .where('recipientId', isEqualTo: userId)
+        .where('read', isEqualTo: false)
+        .get();
+    final toUpdate = snap.docs.where((d) => d.data()['type'] != typeChatMessage);
+    if (toUpdate.isEmpty) return;
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in toUpdate) {
+      batch.update(doc.reference, {'read': true});
+    }
+    await batch.commit();
+  }
+
+  static Future<void> markAppointmentNotificationsAsRead({
+    required String userId,
+    required String appointmentId,
+  }) async {
+    if (appointmentId.isEmpty) return;
+    final snap = await FirebaseFirestore.instance
+        .collection(collection)
+        .where('recipientId', isEqualTo: userId)
+        .where('read', isEqualTo: false)
+        .get();
+    final apptDocs = snap.docs.where((d) => d.data()['appointmentId'] == appointmentId);
+    if (apptDocs.isEmpty) return;
+    final batch = FirebaseFirestore.instance.batch();
+    for (final doc in apptDocs) {
+      batch.update(doc.reference, {'read': true});
+    }
+    await batch.commit();
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> notificationsStream(String userId) {

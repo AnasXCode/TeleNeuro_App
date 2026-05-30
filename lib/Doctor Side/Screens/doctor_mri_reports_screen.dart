@@ -151,6 +151,55 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
     );
   }
 
+  Future<void> _confirmClearAllReports(
+    BuildContext context,
+    String doctorId,
+    Set<String> linkedPatientIds,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear all patient MRI reports?'),
+        content: const Text(
+          'This removes every report from your patient MRI reports list. '
+          'Patients keep their copies in Lab Reports.\n\n'
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear all', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isDeleting = true);
+    try {
+      final count = await MriReportService.clearDoctorReports(
+        doctorId: doctorId,
+        linkedPatientIds: linkedPatientIds,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            count > 0
+                ? 'Removed $count report(s) from your list.'
+                : 'No reports found to clear.',
+          ),
+          backgroundColor: count > 0 ? Colors.green : Colors.blue,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isDeleting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final doctorId = FirebaseAuth.instance.currentUser?.uid;
@@ -161,6 +210,31 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
         title: const Text('Patient MRI reports', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF1565C0),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Clear all reports',
+            onPressed: _isDeleting || doctorId == null
+                ? null
+                : () {
+                    FirebaseFirestore.instance
+                        .collection('appointments')
+                        .where('doctorId', isEqualTo: doctorId)
+                        .where('status', whereIn: ['Accepted', 'Completed'])
+                        .get()
+                        .then((snap) {
+                      final patientIds = <String>{};
+                      for (final d in snap.docs) {
+                        final pid = d.data()['patientId'] as String?;
+                        if (pid != null && pid.isNotEmpty) patientIds.add(pid);
+                      }
+                      if (context.mounted) {
+                        _confirmClearAllReports(context, doctorId, patientIds);
+                      }
+                    });
+                  },
+          ),
+        ],
       ),
       body: doctorId == null
           ? const Center(child: Text('Please sign in'))

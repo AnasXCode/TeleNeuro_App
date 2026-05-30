@@ -18,8 +18,10 @@ import 'mri_upload_screen.dart';
 
 // --- WIDGETS ---
 import '../Widgets/category_card.dart';
-import '../../Widgets/notifications_screen.dart';
+import '../../Widgets/bottom_nav_badge_icon.dart';
+import '../../Widgets/tab_notifications_screen.dart';
 import '../../Widgets/profile_avatar.dart';
+import '../../services/notification_service.dart';
 import 'patient_guide_screen.dart';
 
 // GLOBAL COLORS
@@ -96,12 +98,48 @@ class _PatientDashboardState extends State<PatientDashboard> {
     );
   }
 
+  void _onTabSelected(int index) {
+    setState(() => _selectedIndex = index);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    if (index == 2) {
+      NotificationService.markChatNotificationsAsRead(uid);
+    }
+  }
+
+  List<BottomNavigationBarItem> _buildNavItems(String uid) {
+    return [
+      const BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'Dashboard'),
+      const BottomNavigationBarItem(icon: Icon(Icons.calendar_month_rounded), label: 'Schedule'),
+      BottomNavigationBarItem(
+        icon: uid.isEmpty
+            ? const Icon(Icons.chat_bubble_outline_rounded)
+            : BottomNavBadgeIcon(
+                icon: Icons.chat_bubble_outline_rounded,
+                countStream: NotificationService.unreadChatCountStream(uid),
+              ),
+        label: 'Messages',
+      ),
+      BottomNavigationBarItem(
+        icon: uid.isEmpty
+            ? const Icon(Icons.notifications_outlined)
+            : BottomNavBadgeIcon(
+                icon: Icons.notifications_outlined,
+                countStream: NotificationService.unreadCountStream(uid),
+              ),
+        label: 'Notifications',
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     Widget bodyContent;
     if (_selectedIndex == 0) bodyContent = _buildHomeContent();
     else if (_selectedIndex == 1) bodyContent = const CalendarPage();
-    else bodyContent = const PatientChatScreen();
+    else if (_selectedIndex == 2) bodyContent = const PatientChatScreen();
+    else bodyContent = const TabNotificationsScreen();
 
     return PopScope(
       canPop: false,
@@ -114,14 +152,10 @@ class _PatientDashboardState extends State<PatientDashboard> {
         body: SafeArea(child: bodyContent),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
+          onTap: _onTabSelected,
           type: BottomNavigationBarType.fixed,
           selectedItemColor: kPrimaryColor,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'Dashboard'),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_month_rounded), label: 'Schedule'),
-            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline_rounded), label: 'Messages'),
-          ],
+          items: _buildNavItems(uid),
         ),
       ),
     );
@@ -143,13 +177,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   const Text('Find your Specialist', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kTextDark)),
                 ],
               ),
-              NotificationBadgeIcon(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                ),
-              ),
-              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {
                   final uid = FirebaseAuth.instance.currentUser?.uid;

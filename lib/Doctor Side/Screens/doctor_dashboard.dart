@@ -12,7 +12,9 @@ import 'doctor_guide_screen.dart';
 import 'my_patients_screen.dart';
 import 'doctor_chat_screen.dart';
 import 'doctor_profile_screen.dart';
-import '../../Widgets/notifications_screen.dart';
+import '../../Widgets/bottom_nav_badge_icon.dart';
+import '../../Widgets/tab_notifications_screen.dart';
+import '../../services/notification_service.dart';
 
 class DoctorDashboard extends StatefulWidget {
   const DoctorDashboard({super.key});
@@ -67,13 +69,49 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     );
   }
 
+  void _onTabSelected(int index) {
+    setState(() => _selectedIndex = index);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    if (index == 2) {
+      NotificationService.markChatNotificationsAsRead(uid);
+    }
+  }
+
+  List<BottomNavigationBarItem> _buildNavItems(String uid) {
+    return [
+      const BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Dashboard'),
+      const BottomNavigationBarItem(icon: Icon(Icons.calendar_month_rounded), label: 'Schedule'),
+      BottomNavigationBarItem(
+        icon: uid.isEmpty
+            ? const Icon(Icons.chat_bubble_outline_rounded)
+            : BottomNavBadgeIcon(
+                icon: Icons.chat_bubble_outline_rounded,
+                countStream: NotificationService.unreadChatCountStream(uid),
+              ),
+        label: 'Chat',
+      ),
+      BottomNavigationBarItem(
+        icon: uid.isEmpty
+            ? const Icon(Icons.notifications_outlined)
+            : BottomNavBadgeIcon(
+                icon: Icons.notifications_outlined,
+                countStream: NotificationService.unreadCountStream(uid),
+              ),
+        label: 'Alerts',
+      ),
+      const BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    // List of screens - Passed jump function to Home Tab and back function to Appointments Tab
-    final List<Widget> _screens = [
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final List<Widget> screens = [
       DoctorHomeTab(onSeeAll: _jumpToSchedule),
-      DoctorAppointmentsScreen(onBack: _goToHome), // ✅ Yahan onBack pass kiya gaya hai
+      DoctorAppointmentsScreen(onBack: _goToHome),
       const DoctorChatScreen(),
+      const TabNotificationsScreen(),
       const DoctorProfileScreen(),
     ];
 
@@ -91,22 +129,17 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
         }
       },
       child: Scaffold(
-        body: _screens[_selectedIndex],
+        body: screens[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
-          onTap: (index) => setState(() => _selectedIndex = index),
+          onTap: _onTabSelected,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           selectedItemColor: const Color(0xFF1565C0),
           unselectedItemColor: Colors.grey,
           showUnselectedLabels: true,
           selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: "Dashboard"),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_month_rounded), label: "Schedule"),
-            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline_rounded), label: "Chat"),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: "Profile"),
-          ],
+          items: _buildNavItems(uid),
         ),
       ),
     );
@@ -186,15 +219,6 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
         ),
         backgroundColor: const Color(0xFF1565C0),
         elevation: 0,
-        actions: [
-          NotificationBadgeIcon(
-            iconColor: Colors.white,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

@@ -6,8 +6,41 @@ import '../services/notification_service.dart';
 
 const Color _kPrimary = Color(0xFF1565C0);
 
-class NotificationsScreen extends StatelessWidget {
-  const NotificationsScreen({super.key});
+class NotificationsScreen extends StatefulWidget {
+  final bool showAppBar;
+  final bool embeddedInTab;
+  final bool markGeneralOnOpen;
+
+  const NotificationsScreen({
+    super.key,
+    this.showAppBar = true,
+    this.embeddedInTab = false,
+    this.markGeneralOnOpen = false,
+  });
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  bool _markedGeneral = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.markGeneralOnOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _markGeneralIfNeeded());
+    }
+  }
+
+  Future<void> _markGeneralIfNeeded() async {
+    if (_markedGeneral) return;
+    _markedGeneral = true;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await NotificationService.markGeneralNotificationsAsRead(uid);
+    }
+  }
 
   String _formatTime(dynamic createdAt) {
     if (createdAt is Timestamp) {
@@ -32,23 +65,33 @@ class NotificationsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _markAllRead() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    await NotificationService.markAllAsRead(uid);
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    final useAppBar = widget.showAppBar || widget.embeddedInTab;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        backgroundColor: _kPrimary,
-        foregroundColor: Colors.white,
-        actions: [
-          if (uid != null)
-            TextButton(
-              onPressed: () => NotificationService.markAllAsRead(uid),
-              child: const Text('Mark all read', style: TextStyle(color: Colors.white)),
-            ),
-        ],
-      ),
+      appBar: useAppBar
+          ? AppBar(
+              title: const Text('Notifications'),
+              backgroundColor: _kPrimary,
+              foregroundColor: Colors.white,
+              automaticallyImplyLeading: !widget.embeddedInTab,
+              actions: [
+                if (uid != null)
+                  TextButton(
+                    onPressed: _markAllRead,
+                    child: const Text('Mark all read', style: TextStyle(color: Colors.white)),
+                  ),
+              ],
+            )
+          : null,
       body: uid == null
           ? const Center(child: Text('Please sign in'))
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -138,13 +181,10 @@ class NotificationBadgeIcon extends StatelessWidget {
       );
     }
 
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection(NotificationService.collection)
-          .where('recipientId', isEqualTo: uid)
-          .snapshots(),
+    return StreamBuilder<int>(
+      stream: NotificationService.unreadCountStream(uid),
       builder: (context, snap) {
-        final count = (snap.data?.docs ?? []).where((d) => d.data()['read'] != true).length;
+        final count = snap.data ?? 0;
         return Stack(
           clipBehavior: Clip.none,
           children: [

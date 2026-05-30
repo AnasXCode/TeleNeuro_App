@@ -343,6 +343,29 @@ class MriReportService {
     }
     return false;
   }
+
+  /// Removes all reports visible to this doctor (share copies deleted, legacy entries hidden).
+  static Future<int> clearDoctorReports({
+    required String doctorId,
+    required Set<String> linkedPatientIds,
+  }) async {
+    if (linkedPatientIds.isEmpty) return 0;
+
+    final snap = await FirebaseFirestore.instance.collection(_collection).get();
+    var removed = 0;
+
+    for (final doc in snap.docs) {
+      if (!isDoctorVisibleReport(doc.data(), doctorId, linkedPatientIds)) continue;
+      final ok = await deleteDoctorReport(
+        doctorId: doctorId,
+        documentId: doc.id,
+        linkedPatientIds: linkedPatientIds,
+      );
+      if (ok) removed++;
+    }
+
+    return removed;
+  }
 }
 
 class ShareReportResult {

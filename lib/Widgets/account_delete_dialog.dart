@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/account_deletion_service.dart';
+import 'auth_root_screen.dart';
 
 /// Password-only confirmation for account deletion.
 Future<String?> promptAccountDeletionPassword(BuildContext context) {
@@ -142,7 +143,7 @@ Future<void> performAccountDeletion({
   }
 
   Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => destination),
+    MaterialPageRoute(builder: (_) => AuthRootScreen(child: destination)),
     (_) => false,
   );
 }
