@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../Patient Side/services/mri_report_service.dart';
+
 /// Real-time MRI summaries for patients linked to this doctor via Accepted/Completed
 /// appointments. PDF + MRI image are hosted on Supabase Storage; URLs live in Firestore.
 class DoctorMriReportsScreen extends StatelessWidget {
@@ -142,15 +144,11 @@ class DoctorMriReportsScreen extends StatelessWidget {
                     }
 
                     final reports = reportSnap.data!.docs.where((doc) {
-                      final data = doc.data();
-                      final reportDoctorId = (data['doctorId'] as String?)?.trim();
-                      final patientUid = data['patientUid'] as String?;
-
-                      if (reportDoctorId != null && reportDoctorId.isNotEmpty) {
-                        return reportDoctorId == doctorId;
-                      }
-                      // Legacy reports (before doctor-scoped sharing): visible to all linked doctors.
-                      return patientIds.contains(patientUid);
+                      return MriReportService.isDoctorVisibleReport(
+                        doc.data(),
+                        doctorId,
+                        patientIds,
+                      );
                     }).toList();
 
                     if (reports.isEmpty) {

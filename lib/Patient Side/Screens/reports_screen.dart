@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/mri_report_service.dart';
+
 const Color kPrimaryColor = Color(0xFF1565C0);
 
 class ReportsPage extends StatefulWidget {
@@ -13,6 +15,8 @@ class ReportsPage extends StatefulWidget {
 }
 
 class _ReportsPageState extends State<ReportsPage> {
+  bool _isSharing = false;
+
   Future<void> _openLink(String url) async {
     if (url.isEmpty) return;
     final uri = Uri.parse(url);
@@ -28,20 +32,13 @@ class _ReportsPageState extends State<ReportsPage> {
   String _subtitle(Map<String, dynamic> data) {
     final stage = (data['stage'] ?? '').toString();
     final conf = (data['confidence'] ?? '').toString();
-    final doctorName = (data['doctorName'] ?? '').toString();
     final ca = data['createdAt'];
     String when = '';
     if (ca is Timestamp) {
       final d = ca.toDate();
       when = '${d.day}/${d.month}/${d.year}';
     }
-    final parts = [
-      if (doctorName.isNotEmpty) 'Dr. $doctorName',
-      stage,
-      conf,
-      when,
-    ].where((s) => s.isNotEmpty);
-    return parts.join(' • ');
+    return [stage, conf, when].where((s) => s.isNotEmpty).join(' • ');
   }
 
   int _compareReports(QueryDocumentSnapshot<Map<String, dynamic>> a, QueryDocumentSnapshot<Map<String, dynamic>> b) {
@@ -50,6 +47,102 @@ class _ReportsPageState extends State<ReportsPage> {
     if (ta is! Timestamp) return 1;
     if (tb is! Timestamp) return -1;
     return tb.compareTo(ta);
+  }
+
+  Future<void> _showShareDialog(
+    String libraryDocId,
+    Map<String, dynamic> reportData,
+    String reportTitle,
+  ) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final appointmentSnap = await FirebaseFirestore.instance
+        .collection('appointments')
+        .where('patientId', isEqualTo: uid)
+        .where('status', whereIn: ['Accepted', 'Completed', 'Pending'])
+        .get();
+
+    final doctors = MriReportService.doctorsFromAppointments(appointmentSnap.docs);
+    if (!mounted) return;
+
+    if (doctors.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No active appointments found. Book an appointment before sharing a report.'),
+        ),
+      );
+      return;
+    }
+
+    final entries = doctors.entries.toList()..sort((a, b) => a.value.compareTo(b.value));
+    String? selectedDoctorId;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Share report with doctor'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                reportTitle,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Select doctor',
+                  border: OutlineInputBorder(),
+                ),
+                value: selectedDoctorId,
+                items: entries
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: e.key,
+                        child: Text('Dr. ${e.value}'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setDialogState(() => selectedDoctorId = value),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: selectedDoctorId == null ? null : () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: kPrimaryColor, foregroundColor: Colors.white),
+              child: const Text('Share'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed != true || selectedDoctorId == null || !mounted) return;
+
+    setState(() => _isSharing = true);
+    try {
+      final result = await MriReportService.shareReportWithDoctor(
+        libraryDocId: libraryDocId,
+        reportData: reportData,
+        doctorId: selectedDoctorId!,
+        doctorName: doctors[selectedDoctorId!] ?? 'Doctor',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.ok ? (result.alreadyShared ? Colors.blue : Colors.green) : Colors.orange,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
   }
 
   @override
@@ -64,54 +157,77 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
       body: uid == null
           ? const Center(child: Text('Sign in to see your reports'))
-          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance.collection('mri_reports').where('patientUid', isEqualTo: uid).snapshots(),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final docs = snap.data?.docs.toList() ?? [];
-                docs.sort(_compareReports);
+          : Stack(
+              children: [
+                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                  stream: MriReportService.patientLibraryReportsStream(uid),
+                  builder: (context, snap) {
+                    if (snap.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Text(
-                        'No reports yet.\nAfter MRI analysis tap Download PDF — your report will appear here automatically.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey.shade700, height: 1.4),
-                      ),
-                    ),
-                  );
-                }
+                    final docs = (snap.data?.docs ?? [])
+                        .where((doc) => MriReportService.isPatientLibraryReport(doc.data()))
+                        .toList();
+                    docs.sort(_compareReports);
 
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: docs.length,
-                  itemBuilder: (c, i) {
-                    final data = docs[i].data();
-                    final title = (data['reportId'] ?? 'MRI report').toString();
-                    final pdfUrl = (data['pdfUrl'] ?? '').toString();
-                    final imageUrl = (data['imageUrl'] ?? '').toString();
-                    return ListTile(
-                      leading: imageUrl.isEmpty
-                          ? const Icon(Icons.cloud_done_outlined, color: Colors.green)
-                          : CircleAvatar(backgroundImage: NetworkImage(imageUrl)),
-                      title: Text(title),
-                      subtitle: Text(_subtitle(data)),
-                      trailing: pdfUrl.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                              tooltip: 'Open PDF',
-                              onPressed: () => _openLink(pdfUrl),
-                            ),
-                      onTap: pdfUrl.isEmpty ? null : () => _openLink(pdfUrl),
+                    if (docs.isEmpty) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'No reports yet.\nAfter MRI analysis tap Download PDF — your report will appear here automatically.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey.shade700, height: 1.4),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: docs.length,
+                      itemBuilder: (c, i) {
+                        final doc = docs[i];
+                        final data = doc.data();
+                        final title = (data['reportId'] ?? 'MRI report').toString();
+                        final pdfUrl = (data['pdfUrl'] ?? '').toString();
+                        final imageUrl = (data['imageUrl'] ?? '').toString();
+
+                        return ListTile(
+                          leading: imageUrl.isEmpty
+                              ? const Icon(Icons.cloud_done_outlined, color: Colors.green)
+                              : CircleAvatar(backgroundImage: NetworkImage(imageUrl)),
+                          title: Text(title),
+                          subtitle: Text(_subtitle(data)),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.share_outlined, color: kPrimaryColor),
+                                tooltip: 'Share with doctor',
+                                onPressed: _isSharing ? null : () => _showShareDialog(doc.id, data, title),
+                              ),
+                              if (pdfUrl.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                                  tooltip: 'Open PDF',
+                                  onPressed: () => _openLink(pdfUrl),
+                                ),
+                            ],
+                          ),
+                          onTap: pdfUrl.isEmpty ? null : () => _openLink(pdfUrl),
+                        );
+                      },
                     );
                   },
-                );
-              },
+                ),
+                if (_isSharing)
+                  Container(
+                    color: Colors.black26,
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+              ],
             ),
     );
   }

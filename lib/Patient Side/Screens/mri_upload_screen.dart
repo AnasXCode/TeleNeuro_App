@@ -5,9 +5,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
-import '../../supabase_config.dart';
+import '../services/mri_report_service.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -15,7 +14,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:storage_client/storage_client.dart' show FileOptions, StorageException;
 
 // Theme Colors
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -459,14 +457,15 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
 
       final pdfBytes = Uint8List.fromList(await pdf.save());
 
-      // Upload + Firestore only when a doctor is explicitly selected.
-      if (_selectedDoctorId != null && _selectedDoctorId!.isNotEmpty) {
-        await _publishMriReportToFirebase(
-          reportId: patientID,
+      String? libraryDocId;
+      String uploadStatus = 'skipped';
+
+      if (user != null) {
+        final saveResult = await MriReportService.saveToPatientLibrary(
+          patientUid: user.uid,
           patientName: patientName,
           patientEmail: patientEmail,
-          doctorId: _selectedDoctorId!,
-          doctorName: _selectedDoctorName ?? 'Doctor',
+          reportId: patientID,
           stage: _resultStage!,
           confidence: _confidenceScore!,
           clinicalNotes: clinicalNotes,
@@ -474,6 +473,52 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
           imageBytes: imageBytes,
           mriSourceFile: _selectedMRI!,
         );
+        libraryDocId = saveResult.docId;
+        uploadStatus = saveResult.uploadStatus;
+
+        if (_selectedDoctorId != null && _selectedDoctorId!.isNotEmpty && libraryDocId != null) {
+          final shareResult = await MriReportService.shareReportWithDoctor(
+            libraryDocId: libraryDocId,
+            reportData: {
+              'patientUid': user.uid,
+              'patientName': patientName,
+              'patientEmail': patientEmail,
+              'reportId': patientID,
+              'stage': _resultStage!,
+              'confidence': _confidenceScore!,
+              'clinicalNotes': clinicalNotes,
+              'pdfUrl': saveResult.pdfUrl,
+              'imageUrl': saveResult.imageUrl,
+              'storage': 'supabase',
+            },
+            doctorId: _selectedDoctorId!,
+            doctorName: _selectedDoctorName ?? 'Doctor',
+          );
+
+          if (mounted && !shareResult.ok) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(shareResult.message), backgroundColor: Colors.orange),
+            );
+          }
+        }
+
+        if (mounted) {
+          final uploaded = uploadStatus == 'ok';
+          final sharedNow = _selectedDoctorId != null && _selectedDoctorId!.isNotEmpty;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              duration: Duration(seconds: uploaded ? 4 : 10),
+              backgroundColor: uploaded ? Colors.green : Colors.deepOrange,
+              content: Text(
+                uploaded
+                    ? sharedNow
+                        ? 'Report saved to Lab Reports and shared with Dr. ${_selectedDoctorName ?? 'Doctor'}.'
+                        : 'Report saved to Lab Reports. Share it with a doctor anytime from there.'
+                    : 'Report saved to Lab Reports locally; cloud upload failed.\n$uploadStatus',
+              ),
+            ),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -481,7 +526,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
             duration: Duration(seconds: 6),
             content: Text(
               'PDF saved on this device only.\n'
-              'Select a doctor above to share the report with them.',
+              'Sign in to save the report to Lab Reports and share with your doctor.',
             ),
           ),
         );
@@ -514,132 +559,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     }
   }
 
-  /// Extension + MIME for Storage (picked gallery files may be PNG/WebP, not only JPEG).
-  ({String ext, String mime}) _mriStorageFormat(File mriFile) {
-    final lower = mriFile.path.toLowerCase();
-    if (lower.endsWith('.png')) return (ext: 'png', mime: 'image/png');
-    if (lower.endsWith('.webp')) return (ext: 'webp', mime: 'image/webp');
-    if (lower.endsWith('.gif')) return (ext: 'gif', mime: 'image/gif');
-    if (lower.endsWith('.bmp')) return (ext: 'bmp', mime: 'image/bmp');
-    if (lower.endsWith('.jpeg') || lower.endsWith('.jpg')) {
-      return (ext: 'jpg', mime: 'image/jpeg');
-    }
-    return (ext: 'jpg', mime: 'image/jpeg');
-  }
-
-  /// Uploads MRI scan + PDF to Supabase Storage and writes their public URLs
-  /// + clinical metadata to Firestore so doctors can view them in real time.
-  Future<void> _publishMriReportToFirebase({
-    required String reportId,
-    required String patientName,
-    required String patientEmail,
-    required String doctorId,
-    required String doctorName,
-    required String stage,
-    required String confidence,
-    required String clinicalNotes,
-    required Uint8List pdfBytes,
-    required Uint8List imageBytes,
-    required File mriSourceFile,
-  }) async {
-    if (doctorId.trim().isEmpty) {
-      debugPrint('MRI report publish skipped: doctorId is empty');
-      return;
-    }
-
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.deepOrange,
-            duration: Duration(seconds: 8),
-            content: Text(
-              'Not signed in — PDF was built locally only.\n'
-              'Sign in as patient + add Storage INSERT policy so files upload to Supabase.',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    String? pdfUrl;
-    String? imageUrl;
-    String uploadStatus = 'ok';
-
-    try {
-      final fmt = _mriStorageFormat(mriSourceFile);
-      final storage = Supabase.instance.client.storage.from(SupabaseConfig.supabaseBucket);
-      final imagePath = '${user.uid}/$reportId.${fmt.ext}';
-      final pdfPath = '${user.uid}/$reportId.pdf';
-
-      await storage.uploadBinary(
-        imagePath,
-        imageBytes,
-        fileOptions: FileOptions(contentType: fmt.mime, upsert: true),
-      );
-      imageUrl = storage.getPublicUrl(imagePath);
-
-      await storage.uploadBinary(
-        pdfPath,
-        pdfBytes,
-        fileOptions: const FileOptions(contentType: 'application/pdf', upsert: true),
-      );
-      pdfUrl = storage.getPublicUrl(pdfPath);
-    } on StorageException catch (e) {
-      uploadStatus = '${e.statusCode ?? '?'} ${e.message}';
-      debugPrint('Supabase StorageException: $e');
-    } catch (e) {
-      uploadStatus = e.toString();
-      debugPrint('Supabase upload failed: $e');
-    }
-
-    try {
-      await FirebaseFirestore.instance.collection('mri_reports').add({
-        'patientUid': user.uid,
-        'patientName': patientName,
-        'patientEmail': patientEmail,
-        'doctorId': doctorId,
-        'doctorName': doctorName,
-        'reportId': reportId,
-        'stage': stage,
-        'confidence': confidence,
-        'clinicalNotes': clinicalNotes,
-        'pdfUrl': pdfUrl,
-        'imageUrl': imageUrl,
-        'storage': 'supabase',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      if (mounted) {
-        final ok = pdfUrl != null && imageUrl != null;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            duration: Duration(seconds: ok ? 4 : 12),
-            backgroundColor: ok ? Colors.green : Colors.deepOrange,
-            content: Text(
-              ok
-                  ? 'Report shared with Dr. $doctorName only — MRI + PDF uploaded.'
-                  : 'Supabase upload failed — check Storage policy INSERT for anon on bucket '
-                      '"${SupabaseConfig.supabaseBucket}".\n$uploadStatus',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Firestore sync failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Saved on device; cloud sync failed: $e'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    }
-  }
-
   Widget _buildDoctorSelector() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
@@ -659,11 +578,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     }
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('appointments')
-          .where('patientId', isEqualTo: user.uid)
-          .where('status', whereIn: ['Accepted', 'Completed', 'Pending'])
-          .snapshots(),
+      stream: MriReportService.appointmentDoctorsStream(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: Padding(
@@ -672,16 +587,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
           ));
         }
 
-        final doctors = <String, String>{};
-        for (final doc in snapshot.data?.docs ?? []) {
-          final data = doc.data();
-          if (data['patientDeleted'] == true) continue;
-          final doctorId = (data['doctorId'] as String?)?.trim();
-          final doctorName = (data['doctorName'] as String?)?.trim();
-          if (doctorId != null && doctorId.isNotEmpty) {
-            doctors[doctorId] = doctorName?.isNotEmpty == true ? doctorName! : 'Doctor';
-          }
-        }
+        final doctors = MriReportService.doctorsFromAppointments(snapshot.data?.docs ?? []);
 
         if (doctors.isEmpty) {
           return Container(
@@ -719,7 +625,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               isExpanded: true,
               value: selectedId,
               hint: const Text(
-                'Select doctor to share report with',
+                'Optionally share now with a doctor',
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               items: entries
