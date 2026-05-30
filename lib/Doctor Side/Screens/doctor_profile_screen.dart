@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import '../Auth/doctor_login_page.dart';
+import '../../Profile Side/profile_selection.dart';
 import '../../Widgets/profile_avatar.dart';
 import '../../Widgets/account_delete_dialog.dart';
 import '../../services/profile_image_service.dart';
@@ -168,6 +169,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     performAccountDeletion(
       context: context,
       destination: const DoctorLoginScreen(),
+      stackRoot: const ProfileSelectionScreen(),
     );
   }
 

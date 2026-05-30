@@ -115,9 +115,13 @@ void _hideDeletionProgress(BuildContext context) {
 }
 
 /// Password prompt → delete → dismiss loading → redirect or show error.
+///
+/// When [stackRoot] is provided, the stack becomes `[stackRoot, destination]` so
+/// Back from [destination] returns to the app entry screen instead of a blank route.
 Future<void> performAccountDeletion({
   required BuildContext context,
   required Widget destination,
+  Widget? stackRoot,
 }) async {
   final password = await promptAccountDeletionPassword(context);
   if (password == null || !context.mounted) return;
@@ -142,8 +146,19 @@ Future<void> performAccountDeletion({
     return;
   }
 
-  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-    MaterialPageRoute(builder: (_) => AuthRootScreen(child: destination)),
-    (_) => false,
-  );
+  final navigator = Navigator.of(context, rootNavigator: true);
+  if (stackRoot != null) {
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => stackRoot),
+      (_) => false,
+    );
+    navigator.push(
+      MaterialPageRoute(builder: (_) => destination),
+    );
+  } else {
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => AuthRootScreen(child: destination)),
+      (_) => false,
+    );
+  }
 }
