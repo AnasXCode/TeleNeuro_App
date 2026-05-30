@@ -37,6 +37,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
   String? _resultStage;
   String? _confidenceScore;
   String? _pdfFilePath;
+  String? _selectedDoctorId;
+  String? _selectedDoctorName;
 
   Interpreter? _interpreter;
   final List<String> _classes = [
@@ -73,6 +75,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         _resultStage = null;
         _confidenceScore = null;
         _pdfFilePath = null;
+        _selectedDoctorId = null;
+        _selectedDoctorName = null;
       });
     }
   }
@@ -86,6 +90,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       _resultStage = null;
       _confidenceScore = null;
       _pdfFilePath = null;
+      _selectedDoctorId = null;
+      _selectedDoctorName = null;
     });
 
     // 1. SHOW WAITING DIALOG
@@ -453,19 +459,33 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
 
       final pdfBytes = Uint8List.fromList(await pdf.save());
 
-      // Upload + Firestore FIRST. Opening the PDF with OpenFile can throw or hang on some
-      // devices — if it ran before upload, Supabase would stay empty.
-      await _publishMriReportToFirebase(
-        reportId: patientID,
-        patientName: patientName,
-        patientEmail: patientEmail,
-        stage: _resultStage!,
-        confidence: _confidenceScore!,
-        clinicalNotes: clinicalNotes,
-        pdfBytes: pdfBytes,
-        imageBytes: imageBytes,
-        mriSourceFile: _selectedMRI!,
-      );
+      // Upload + Firestore only when a doctor is explicitly selected.
+      if (_selectedDoctorId != null && _selectedDoctorId!.isNotEmpty) {
+        await _publishMriReportToFirebase(
+          reportId: patientID,
+          patientName: patientName,
+          patientEmail: patientEmail,
+          doctorId: _selectedDoctorId!,
+          doctorName: _selectedDoctorName ?? 'Doctor',
+          stage: _resultStage!,
+          confidence: _confidenceScore!,
+          clinicalNotes: clinicalNotes,
+          pdfBytes: pdfBytes,
+          imageBytes: imageBytes,
+          mriSourceFile: _selectedMRI!,
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.deepOrange,
+            duration: Duration(seconds: 6),
+            content: Text(
+              'PDF saved on this device only.\n'
+              'Select a doctor above to share the report with them.',
+            ),
+          ),
+        );
+      }
 
       final output = await getTemporaryDirectory();
       final file = File("${output.path}/TeleNeuro_Report_${patientID}.pdf");
@@ -513,6 +533,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     required String reportId,
     required String patientName,
     required String patientEmail,
+    required String doctorId,
+    required String doctorName,
     required String stage,
     required String confidence,
     required String clinicalNotes,
@@ -520,6 +542,11 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     required Uint8List imageBytes,
     required File mriSourceFile,
   }) async {
+    if (doctorId.trim().isEmpty) {
+      debugPrint('MRI report publish skipped: doctorId is empty');
+      return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       if (mounted) {
@@ -573,6 +600,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         'patientUid': user.uid,
         'patientName': patientName,
         'patientEmail': patientEmail,
+        'doctorId': doctorId,
+        'doctorName': doctorName,
         'reportId': reportId,
         'stage': stage,
         'confidence': confidence,
@@ -591,7 +620,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
             backgroundColor: ok ? Colors.green : Colors.deepOrange,
             content: Text(
               ok
-                  ? 'Report uploaded — MRI + PDF are in Supabase; URLs saved in Firestore.'
+                  ? 'Report shared with Dr. $doctorName only — MRI + PDF uploaded.'
                   : 'Supabase upload failed — check Storage policy INSERT for anon on bucket '
                       '"${SupabaseConfig.supabaseBucket}".\n$uploadStatus',
             ),
@@ -609,6 +638,110 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         );
       }
     }
+  }
+
+  Widget _buildDoctorSelector() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: const Text(
+          'Sign in to share this report with your doctor.',
+          style: TextStyle(color: kTextDark, fontSize: 13),
+        ),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('appointments')
+          .where('patientId', isEqualTo: user.uid)
+          .where('status', whereIn: ['Accepted', 'Completed', 'Pending'])
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: Padding(
+            padding: EdgeInsets.all(8),
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ));
+        }
+
+        final doctors = <String, String>{};
+        for (final doc in snapshot.data?.docs ?? []) {
+          final data = doc.data();
+          if (data['patientDeleted'] == true) continue;
+          final doctorId = (data['doctorId'] as String?)?.trim();
+          final doctorName = (data['doctorName'] as String?)?.trim();
+          if (doctorId != null && doctorId.isNotEmpty) {
+            doctors[doctorId] = doctorName?.isNotEmpty == true ? doctorName! : 'Doctor';
+          }
+        }
+
+        if (doctors.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: const Text(
+              'No active appointments found. Book an appointment first to share this report with a doctor.',
+              style: TextStyle(color: kTextDark, fontSize: 13),
+            ),
+          );
+        }
+
+        final entries = doctors.entries.toList()
+          ..sort((a, b) => a.value.compareTo(b.value));
+
+        final selectedId = _selectedDoctorId != null && doctors.containsKey(_selectedDoctorId)
+            ? _selectedDoctorId
+            : null;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kSecondaryColor.withOpacity(0.5)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: selectedId,
+              hint: const Text(
+                'Select doctor to share report with',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+              items: entries
+                  .map(
+                    (e) => DropdownMenuItem<String>(
+                      value: e.key,
+                      child: Text('Dr. ${e.value}', style: const TextStyle(fontSize: 14)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _selectedDoctorId = value;
+                  _selectedDoctorName = doctors[value];
+                });
+              },
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -818,6 +951,22 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
 
                   const SizedBox(height: 20),
 
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Share with doctor',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: kTextDark,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildDoctorSelector(),
+
+                  const SizedBox(height: 20),
+
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -852,9 +1001,19 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                       height: 55,
                       child: ElevatedButton.icon(
                         onPressed: () async {
+                          if (_selectedDoctorId == null || _selectedDoctorId!.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please select a doctor before sharing the report.'),
+                              ),
+                            );
+                            return;
+                          }
+                          final doctorLabel = _selectedDoctorName ?? 'Doctor';
                           await Share.shareXFiles(
                             [XFile(_pdfFilePath!)],
-                            text: 'Hello Doctor, please find my TeleNeuro MRI Diagnostic Report attached for our consultation.',
+                            text:
+                                'Hello Dr. $doctorLabel, please find my TeleNeuro MRI Diagnostic Report attached for our consultation.',
                           );
                         },
                         icon: const Icon(Icons.share, color: Colors.white),

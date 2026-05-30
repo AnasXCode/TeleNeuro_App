@@ -141,7 +141,17 @@ class DoctorMriReportsScreen extends StatelessWidget {
                       return const Center(child: Text('No reports yet'));
                     }
 
-                    final reports = reportSnap.data!.docs.where((doc) => patientIds.contains(doc.data()['patientUid'] as String?)).toList();
+                    final reports = reportSnap.data!.docs.where((doc) {
+                      final data = doc.data();
+                      final reportDoctorId = (data['doctorId'] as String?)?.trim();
+                      final patientUid = data['patientUid'] as String?;
+
+                      if (reportDoctorId != null && reportDoctorId.isNotEmpty) {
+                        return reportDoctorId == doctorId;
+                      }
+                      // Legacy reports (before doctor-scoped sharing): visible to all linked doctors.
+                      return patientIds.contains(patientUid);
+                    }).toList();
 
                     if (reports.isEmpty) {
                       return Center(

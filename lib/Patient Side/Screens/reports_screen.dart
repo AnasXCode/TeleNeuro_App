@@ -28,13 +28,20 @@ class _ReportsPageState extends State<ReportsPage> {
   String _subtitle(Map<String, dynamic> data) {
     final stage = (data['stage'] ?? '').toString();
     final conf = (data['confidence'] ?? '').toString();
+    final doctorName = (data['doctorName'] ?? '').toString();
     final ca = data['createdAt'];
     String when = '';
     if (ca is Timestamp) {
       final d = ca.toDate();
       when = '${d.day}/${d.month}/${d.year}';
     }
-    return [stage, conf, when].where((s) => s.isNotEmpty).join(' • ');
+    final parts = [
+      if (doctorName.isNotEmpty) 'Dr. $doctorName',
+      stage,
+      conf,
+      when,
+    ].where((s) => s.isNotEmpty);
+    return parts.join(' • ');
   }
 
   int _compareReports(QueryDocumentSnapshot<Map<String, dynamic>> a, QueryDocumentSnapshot<Map<String, dynamic>> b) {
