@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../services/active_chat_tracker.dart';
 import '../../services/notification_service.dart';
+import '../../services/chat_deletion_service.dart';
 import '../../Widgets/profile_view_screens.dart';
+import '../../Widgets/profile_avatar.dart';
 
 // ====================================================
 // PART 1: PATIENT MESSAGES LIST
@@ -18,8 +20,11 @@ class PatientChatScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Chat?"),
-        content: const Text("This will hide this chat from YOUR history only."),
+        title: const Text("Delete conversation?"),
+        content: const Text(
+          "All messages in this chat will be permanently deleted from your account. "
+          "The appointment record is kept for scheduling history.",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -29,12 +34,23 @@ class PatientChatScreen extends StatelessWidget {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(context);
-
-              // ✅ CHANGE: Sirf Patient ke liye 'Hide' kar rahe hain
-              await FirebaseFirestore.instance
-                  .collection('appointments')
-                  .doc(docId)
-                  .update({'patientDeleted': true});
+              try {
+                await ChatDeletionService.deleteConversation(
+                  appointmentId: docId,
+                  deletedByPatient: true,
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Conversation deleted')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not delete: $e'), backgroundColor: Colors.orange),
+                  );
+                }
+              }
             },
             child: const Text("Delete", style: TextStyle(color: Colors.white)),
           ),
@@ -102,9 +118,10 @@ class PatientChatScreen extends StatelessWidget {
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: ListTile(
                   onTap: () => _openChat(context, data, docId),
-                  leading: CircleAvatar(
-                    backgroundColor: isCompleted ? Colors.grey[300] : const Color(0xFFE3F2FD),
-                    child: Icon(Icons.medical_services, color: isCompleted ? Colors.grey : const Color(0xFF1565C0)),
+                  leading: ProfileAvatar(
+                    userId: (data['doctorId'] ?? '').toString(),
+                    radius: 24,
+                    fallbackIcon: Icons.medical_services,
                   ),
                   title: Text(
                       "Dr. ${data['doctorName']}",
@@ -369,7 +386,17 @@ class _ChatScreenState extends State<ChatScreen> {
               if (context.mounted) _openPeerProfile(context, snap.data());
             });
           },
-          child: Text(widget.receiverName),
+          child: Row(
+            children: [
+              ProfileAvatar(
+                userId: widget.receiverId,
+                radius: 18,
+                fallbackIcon: Icons.person,
+              ),
+              const SizedBox(width: 10),
+              Expanded(child: Text(widget.receiverName, overflow: TextOverflow.ellipsis)),
+            ],
+          ),
         ),
         backgroundColor: const Color(0xFF1565C0),
       ),

@@ -8,6 +8,7 @@ import '../Widgets/request_card.dart';
 // --- SCREENS IMPORTS ---
 import 'doctor_appointments_screen.dart';
 import 'doctor_mri_reports_screen.dart';
+import 'doctor_guide_screen.dart';
 import 'my_patients_screen.dart';
 import 'doctor_chat_screen.dart';
 import 'doctor_profile_screen.dart';
@@ -296,6 +297,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                     String docId = docs[index].id;
 
                     Map<String, String> requestData = {
+                      'patientId': (data['patientId'] ?? '').toString(),
                       'name': (data['patientName'] ?? 'Unknown').toString(),
                       'age': 'N/A',
                       'issue': (data['problem'] ?? 'Consultation').toString(),
@@ -341,6 +343,27 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                 onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (c) => const DoctorMriReportsScreen()));
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+              ),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.menu_book_outlined, color: Colors.teal),
+                ),
+                title: const Text('User Guide', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('How to use TeleNeuro as a doctor'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (c) => const DoctorGuideScreen()));
                 },
               ),
             ),

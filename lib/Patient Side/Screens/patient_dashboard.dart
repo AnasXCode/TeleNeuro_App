@@ -19,6 +19,8 @@ import 'mri_upload_screen.dart';
 // --- WIDGETS ---
 import '../Widgets/category_card.dart';
 import '../../Widgets/notifications_screen.dart';
+import '../../Widgets/profile_avatar.dart';
+import 'patient_guide_screen.dart';
 
 // GLOBAL COLORS
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -150,19 +152,21 @@ class _PatientDashboardState extends State<PatientDashboard> {
               const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const ProfileDisplayPage()),
-                  ).then((_) {
-                    _loadDashboardImage();
-                    _fetchUserName();
-                  });
+                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  if (uid != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ProfileDisplayPage()),
+                    ).then((_) {
+                      _loadDashboardImage();
+                      _fetchUserName();
+                    });
+                  }
                 },
-                child: CircleAvatar(
+                child: ProfileAvatar(
+                  userId: FirebaseAuth.instance.currentUser?.uid,
+                  localFile: _dashboardProfileImage,
                   radius: 20,
-                  backgroundColor: kAccentColor,
-                  backgroundImage: _dashboardProfileImage != null ? FileImage(_dashboardProfileImage!) : null,
-                  child: _dashboardProfileImage == null ? const Icon(Icons.person, color: kPrimaryColor) : null,
                 ),
               ),
             ],
@@ -267,7 +271,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const CircleAvatar(radius: 35, backgroundColor: kAccentColor, backgroundImage: AssetImage('assets/images/doctor1.png'), child: Icon(Icons.person, size: 35, color: kPrimaryColor)),
+                            ProfileAvatar(
+                              userId: docId,
+                              radius: 35,
+                              fallbackIcon: Icons.medical_services,
+                            ),
                             const SizedBox(height: 10),
                             Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: kTextDark)),
                             const SizedBox(height: 4),
@@ -305,6 +313,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
               CategoryCard(title: 'Find Doctor', subtitle: 'Specialists', icon: Icons.person_search_rounded, color: const Color(0xFFEC407A), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDoctorsScreen()))),
               CategoryCard(title: 'Lab Reports', subtitle: 'Check History', icon: Icons.insert_drive_file_rounded, color: const Color(0xFF7E57C2), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ReportsPage()))),
               CategoryCard(title: 'AI Diagnosis', subtitle: 'Upload MRI', icon: Icons.document_scanner_rounded, color: const Color(0xFF00897B), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MRIUploadPage()))),
+              CategoryCard(title: 'User Guide', subtitle: 'How to use app', icon: Icons.menu_book_rounded, color: const Color(0xFF455A64), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const PatientGuideScreen()))),
             ],
           ),
           const SizedBox(height: 20),

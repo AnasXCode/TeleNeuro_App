@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 // Ensure imports are correct
 
-import 'chat_screen.dart'; // Apni chat screen ka path check karein
-import 'consult_doctor_screen.dart'; // Booking page import
+import 'chat_screen.dart';
+import 'consult_doctor_screen.dart';
+import '../../Widgets/profile_avatar.dart';
 
 const Color kPrimaryColor = Color(0xFF1565C0);
 const Color kAccentColor = Color(0xFFE3F2FD);
@@ -41,10 +42,10 @@ class DoctorProfilePage extends StatelessWidget {
           children: [
             // Profile Header
             Center(
-              child: CircleAvatar(
+              child: ProfileAvatar(
+                userId: doctorId,
                 radius: 50,
-                backgroundColor: kAccentColor,
-                child: Icon(Icons.person, size: 50, color: kPrimaryColor),
+                fallbackIcon: Icons.medical_services,
               ),
             ),
             const SizedBox(height: 15),

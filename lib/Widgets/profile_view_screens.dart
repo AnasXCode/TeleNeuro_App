@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../services/user_profile_service.dart';
 import '../Patient Side/Screens/consult_doctor_screen.dart';
+import '../Widgets/profile_avatar.dart';
+import '../Widgets/doctor_reviews_section.dart';
 
 const Color _kPrimary = Color(0xFF1565C0);
 const Color _kTextDark = Color(0xFF37474F);
@@ -56,7 +58,12 @@ class _PatientProfileViewScreenState extends State<PatientProfileViewScreen> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  _avatar(_data?['profileImage'] as File?),
+                  ProfileAvatar(
+                    userId: widget.patientId,
+                    photoUrl: _data?['photoUrl'] as String?,
+                    localFile: _data?['profileImage'] as File?,
+                    radius: 52,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     _data?['name']?.toString() ?? 'Patient',
@@ -135,10 +142,11 @@ class _DoctorProfileViewScreenState extends State<DoctorProfileViewScreen> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  const CircleAvatar(
+                  ProfileAvatar(
+                    userId: widget.doctorId,
+                    photoUrl: _data?['photoUrl'] as String?,
                     radius: 52,
-                    backgroundColor: Color(0xFFE3F2FD),
-                    child: Icon(Icons.medical_services, size: 52, color: _kPrimary),
+                    fallbackIcon: Icons.medical_services,
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -159,6 +167,13 @@ class _DoctorProfileViewScreenState extends State<DoctorProfileViewScreen> {
                         _data?['ratingDisplay']?.toString() ?? '—',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
+                      if ((_data?['totalReviews'] as int? ?? 0) > 0) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${_data!['totalReviews']} reviews)',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -204,20 +219,16 @@ class _DoctorProfileViewScreenState extends State<DoctorProfileViewScreen> {
                       ],
                     ),
                   ],
+                  DoctorReviewsSection(
+                    doctorId: widget.doctorId,
+                    averageRating: _data?['averageRating'] as double?,
+                    totalReviews: _data?['totalReviews'] as int? ?? 0,
+                  ),
                 ],
               ),
             ),
     );
   }
-}
-
-Widget _avatar(File? file) {
-  return CircleAvatar(
-    radius: 52,
-    backgroundColor: const Color(0xFFE3F2FD),
-    backgroundImage: file != null ? FileImage(file) : null,
-    child: file == null ? const Icon(Icons.person, size: 52, color: _kPrimary) : null,
-  );
 }
 
 Widget _tile(IconData icon, String label, dynamic value) {

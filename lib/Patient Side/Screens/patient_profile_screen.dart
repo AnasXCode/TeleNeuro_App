@@ -5,6 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../services/user_profile_service.dart';
+import '../../services/profile_image_service.dart';
+import '../../services/account_deletion_service.dart';
+import '../../Widgets/profile_avatar.dart';
+import '../../Widgets/account_delete_dialog.dart';
+import '../Auth/patient_portal.dart';
 
 // --- THEME COLORS ---
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -20,6 +25,7 @@ class ProfileDisplayPage extends StatefulWidget {
 
 class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
   String name = "Loading...", email = "", phone = "", gender = "", address = "", bloodGroup = "", dob = "", emergency = "", medicalConditions = "";
+  String? photoUrl;
   File? profileImage;
   bool _loading = true;
 
@@ -43,6 +49,7 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
       dob = data['dob']?.toString() ?? '—';
       emergency = data['emergency']?.toString() ?? '—';
       medicalConditions = data['medicalConditions']?.toString() ?? '—';
+      photoUrl = data['photoUrl'] as String?;
       profileImage = data['profileImage'] as File?;
       _loading = false;
     });
@@ -65,7 +72,7 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit, color: Colors.white),
-            onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const PatientProfilePage())),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PatientProfilePage())).then((_) => _loadDisplayData()),
           ),
         ],
       ),
@@ -74,11 +81,11 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
         child: Column(
           children: [
             Center(
-              child: CircleAvatar(
-                  radius: 55,
-                  backgroundImage: profileImage != null ? FileImage(profileImage!) : null,
-                  backgroundColor: kAccentColor,
-                  child: profileImage == null ? const Icon(Icons.person, size: 60, color: kPrimaryColor) : null
+              child: ProfileAvatar(
+                userId: FirebaseAuth.instance.currentUser?.uid,
+                photoUrl: photoUrl,
+                localFile: profileImage,
+                radius: 55,
               ),
             ),
             const SizedBox(height: 15),
@@ -94,9 +101,42 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
             _infoTile(Icons.phone_in_talk, "Emergency Contact", emergency),
             _infoTile(Icons.location_on, "Address", address),
             _infoTile(Icons.medical_services, "Medical Conditions", medicalConditions),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: () => _handleDeleteAccount(context),
+                icon: const Icon(Icons.delete_forever, color: Colors.red),
+                label: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+              ),
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _handleDeleteAccount(BuildContext context) async {
+    final confirmed = await confirmAccountDeletion(context);
+    if (!confirmed || !context.mounted) return;
+
+    final error = await AccountDeletionService.deleteCurrentAccount();
+    if (!context.mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const PatientPortalScreen()),
+      (_) => false,
     );
   }
 
@@ -194,6 +234,12 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
           'bloodGroup': bloodGroup,
         },
       );
+      if (_profileImage != null) {
+        await ProfileImageService.uploadAndSaveProfilePhoto(
+          userId: uid,
+          imageFile: _profileImage!,
+        );
+      }
     }
 
     if (!mounted) return;

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../services/notification_service.dart';
+import '../../Widgets/profile_avatar.dart';
 
 class ConsultDoctorPage extends StatefulWidget {
   // ✅ 1. Yahan humne parameters add kiye taake Dashboard se Data le sakein
@@ -200,7 +201,27 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Text
+            Center(
+              child: Column(
+                children: [
+                  ProfileAvatar(
+                    userId: widget.doctorId,
+                    radius: 40,
+                    fallbackIcon: Icons.medical_services,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Dr. ${widget.doctorName}',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: kPrimaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
             Text(
               "Consultation Details",
               style: TextStyle(

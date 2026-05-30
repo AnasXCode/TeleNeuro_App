@@ -112,13 +112,14 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
 
             // Mapping Data safely
             Map<String, String> cardData = {
+              'patientId': (data['patientId'] ?? '').toString(),
               'name': (data['patientName'] ?? 'Unknown').toString(),
               'age': 'N/A',
               'issue': (data['problem'] ?? 'General').toString(),
               'time': (data['time'] ?? '00:00').toString(),
               'date': (data['date'] ?? '').toString(),
               'type': 'Online',
-              'image': 'assets/images/patient_placeholder.png', // Dummy image
+              'image': 'assets/images/patient_placeholder.png',
             };
 
             if (status == 'Pending') {

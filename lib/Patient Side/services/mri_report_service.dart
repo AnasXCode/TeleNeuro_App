@@ -24,6 +24,11 @@ class MriReportService {
   static bool isDoctorVisibleReport(Map<String, dynamic> data, String doctorId, Set<String> linkedPatientIds) {
     if (data['isPatientLibrary'] == true) return false;
 
+    final hidden = data['hiddenForDoctorIds'];
+    if (hidden is List && hidden.map((e) => e.toString()).contains(doctorId)) {
+      return false;
+    }
+
     final reportDoctorId = (data['doctorId'] as String?)?.trim();
     if (reportDoctorId != null && reportDoctorId.isNotEmpty) {
       return reportDoctorId == doctorId;
@@ -260,6 +265,83 @@ class MriReportService {
         .where('status', whereIn: ['Accepted', 'Completed', 'Pending'])
         .get();
     return doctorsFromAppointments(snapshot.docs);
+  }
+
+  /// Removes only the patient's Lab Reports library copies (not doctor share records).
+  static Future<int> clearPatientLibraryReports(String patientUid) async {
+    final snap = await FirebaseFirestore.instance
+        .collection(_collection)
+        .where('patientUid', isEqualTo: patientUid)
+        .get();
+
+    final toDelete = snap.docs.where((d) => isPatientLibraryReport(d.data())).toList();
+    if (toDelete.isEmpty) return 0;
+
+    var deleted = 0;
+    for (var i = 0; i < toDelete.length; i += 400) {
+      final batch = FirebaseFirestore.instance.batch();
+      final chunk = toDelete.skip(i).take(400);
+      for (final doc in chunk) {
+        batch.delete(doc.reference);
+        deleted++;
+      }
+      await batch.commit();
+    }
+    return deleted;
+  }
+
+  /// Deletes one patient library report after ownership check. Returns true if removed.
+  static Future<bool> deletePatientLibraryReport({
+    required String patientUid,
+    required String documentId,
+  }) async {
+    final docRef = FirebaseFirestore.instance.collection(_collection).doc(documentId);
+    final snap = await docRef.get();
+    if (!snap.exists) return false;
+
+    final data = snap.data() ?? {};
+    if ((data['patientUid'] as String?) != patientUid) return false;
+    if (!isPatientLibraryReport(data)) return false;
+
+    await docRef.delete();
+    final after = await docRef.get();
+    return !after.exists;
+  }
+
+  /// Removes a report from the doctor's list (share copy or hides legacy entry).
+  static Future<bool> deleteDoctorReport({
+    required String doctorId,
+    required String documentId,
+    required Set<String> linkedPatientIds,
+  }) async {
+    final docRef = FirebaseFirestore.instance.collection(_collection).doc(documentId);
+    final snap = await docRef.get();
+    if (!snap.exists) return false;
+
+    final data = snap.data() ?? {};
+    if (data['isPatientLibrary'] == true) return false;
+
+    final patientUid = data['patientUid'] as String?;
+    if (patientUid == null || !linkedPatientIds.contains(patientUid)) return false;
+
+    if (!isDoctorVisibleReport(data, doctorId, linkedPatientIds)) return false;
+
+    final reportDoctorId = (data['doctorId'] as String?)?.trim();
+    if (reportDoctorId != null && reportDoctorId.isNotEmpty && reportDoctorId == doctorId) {
+      await docRef.delete();
+      return !(await docRef.get()).exists;
+    }
+
+    // Legacy broadcast report: hide for this doctor only.
+    await docRef.update({
+      'hiddenForDoctorIds': FieldValue.arrayUnion([doctorId]),
+    });
+    final updated = await docRef.get();
+    final hidden = updated.data()?['hiddenForDoctorIds'];
+    if (hidden is List) {
+      return hidden.map((e) => e.toString()).contains(doctorId);
+    }
+    return false;
   }
 }
 

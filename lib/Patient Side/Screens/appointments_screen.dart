@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../Widgets/profile_avatar.dart';
+
 class CalendarPage extends StatefulWidget {
   const CalendarPage({super.key});
 
@@ -236,9 +238,10 @@ class _CalendarPageState extends State<CalendarPage> {
                 child: Column(
                   children: [
                     ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: statusColor.withOpacity(0.1),
-                        child: Icon(Icons.calendar_month, color: statusColor),
+                      leading: ProfileAvatar(
+                        userId: (data['doctorId'] ?? '').toString(),
+                        radius: 24,
+                        fallbackIcon: Icons.medical_services,
                       ),
                       title: Text("Dr. ${data['doctorName'] ?? 'Unknown'}", style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Column(

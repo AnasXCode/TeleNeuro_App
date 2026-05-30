@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'consult_doctor_screen.dart';
 import '../../Widgets/profile_view_screens.dart';
+import '../../Widgets/profile_avatar.dart';
 
 // Colors
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -92,11 +92,10 @@ class AllDoctorsScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
-                        const CircleAvatar(
+                        ProfileAvatar(
+                          userId: docId,
                           radius: 30,
-                          backgroundColor: kAccentColor,
-                          backgroundImage: AssetImage('assets/images/doctor1.png'),
-                          child: Icon(Icons.person, color: kPrimaryColor),
+                          fallbackIcon: Icons.medical_services,
                         ),
                         const SizedBox(width: 15),
                         Expanded(

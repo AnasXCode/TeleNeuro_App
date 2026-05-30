@@ -3,7 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../Patient Side/Screens/chat_screen.dart';
 import '../../services/notification_service.dart';
+import '../../services/chat_deletion_service.dart';
 import '../../Widgets/profile_view_screens.dart';
+import '../../Widgets/profile_avatar.dart';
 
 class DoctorChatScreen extends StatelessWidget {
   const DoctorChatScreen({super.key});
@@ -62,8 +64,11 @@ class DoctorChatScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Delete Chat?"),
-        content: const Text("This will hide this chat from YOUR list only."),
+        title: const Text("Delete conversation?"),
+        content: const Text(
+          "All messages will be permanently deleted from your inbox. "
+          "The appointment record remains for your records.",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -73,10 +78,23 @@ class DoctorChatScreen extends StatelessWidget {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               Navigator.pop(context);
-              await FirebaseFirestore.instance
-                  .collection('appointments')
-                  .doc(appointmentId)
-                  .update({'doctorDeleted': true});
+              try {
+                await ChatDeletionService.deleteConversation(
+                  appointmentId: appointmentId,
+                  deletedByPatient: false,
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Conversation deleted')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not delete: $e'), backgroundColor: Colors.orange),
+                  );
+                }
+              }
             },
             child: const Text("Delete", style: TextStyle(color: Colors.white)),
           ),
@@ -154,9 +172,9 @@ class DoctorChatScreen extends StatelessWidget {
                           );
                         }
                       : null,
-                  leading: CircleAvatar(
-                    backgroundColor: isCompleted ? Colors.grey[300] : const Color(0xFFE3F2FD),
-                    child: Icon(Icons.person, color: isCompleted ? Colors.grey : const Color(0xFF1565C0)),
+                  leading: ProfileAvatar(
+                    userId: patientId,
+                    radius: 24,
                   ),
                   title: Text(
                       data['patientName'] ?? "Unknown",

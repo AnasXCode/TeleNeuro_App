@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../Widgets/profile_avatar.dart';
+
 class RequestCard extends StatelessWidget {
   final Map<String, String> request;
   final VoidCallback onAccept;
@@ -32,10 +34,9 @@ class RequestCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(
+              ProfileAvatar(
+                userId: request['patientId'],
                 radius: 25,
-                backgroundColor: Colors.blue.shade50,
-                child: const Icon(Icons.person, color: Colors.blue),
               ),
               const SizedBox(width: 15),
               Expanded(

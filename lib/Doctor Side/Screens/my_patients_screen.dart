@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../Widgets/profile_view_screens.dart';
+import '../../Widgets/profile_avatar.dart';
 
 class MyPatientsScreen extends StatefulWidget {
   const MyPatientsScreen({super.key});
@@ -108,9 +109,9 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
                             ),
                           );
                         },
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFE3F2FD),
-                    child: Icon(Icons.person, color: Color(0xFF1565C0)),
+                  leading: ProfileAvatar(
+                    userId: patientId,
+                    radius: 24,
                   ),
                   title: Text(
                       patient['patientName'] ?? "Unknown Patient",

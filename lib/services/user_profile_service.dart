@@ -22,6 +22,9 @@ class UserProfileService {
       if (doc.exists) firestore = doc.data() ?? {};
     } catch (_) {}
 
+    final photoUrlRaw = firestore['photoUrl'] as String?;
+    final photoUrl = (photoUrlRaw != null && photoUrlRaw.trim().isNotEmpty) ? photoUrlRaw.trim() : null;
+
     File? imageFile;
     if (isSelf) {
       final path = prefs.getString('imagePath');
@@ -42,6 +45,7 @@ class UserProfileService {
         firestore['medicalConditions'] ?? firestore['conditions'],
         _str(prefs.getString('conditions'), '—'),
       ),
+      'photoUrl': photoUrl,
       'profileImage': imageFile,
     };
   }
@@ -56,11 +60,15 @@ class UserProfileService {
     final totalReviews = (data['totalReviews'] ?? 0) as num;
     final rating = data['rating'];
     String ratingDisplay;
+    double? averageRating;
     if (totalReviews == 0) {
       ratingDisplay = 'New';
     } else {
-      ratingDisplay = '${rating ?? '0.0'} / 5.0';
+      averageRating = (rating ?? 0.0).toDouble();
+      ratingDisplay = '${averageRating!.toStringAsFixed(1)} / 5.0';
     }
+
+    final photoUrlRaw = data['photoUrl'] as String?;
 
     return {
       'uid': doctorUid,
@@ -74,7 +82,9 @@ class UserProfileService {
       'about': _str(data['about'], '—'),
       'availability': _str(data['timing'] ?? data['availability'], '—'),
       'ratingDisplay': ratingDisplay,
+      'averageRating': averageRating,
       'totalReviews': totalReviews.toInt(),
+      'photoUrl': (photoUrlRaw != null && photoUrlRaw.trim().isNotEmpty) ? photoUrlRaw.trim() : null,
     };
   }
 

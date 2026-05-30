@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/mri_report_service.dart';
 
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -145,6 +147,89 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
+  Future<void> _confirmDeleteReport(String documentId, String title) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete report?'),
+        content: Text(
+          'Remove "$title" from your Lab Reports? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final deleted = await MriReportService.deletePatientLibraryReport(
+      patientUid: uid,
+      documentId: documentId,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          deleted ? 'Report deleted.' : 'Could not delete this report. Please try again.',
+        ),
+        backgroundColor: deleted ? Colors.green : Colors.orange,
+      ),
+    );
+  }
+
+  Future<void> _confirmClearHistory() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear Lab Reports history?'),
+        content: const Text(
+          'This permanently removes your saved MRI reports from Lab Reports. '
+          'Reports already shared with doctors remain on their side.\n\n'
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear all', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final count = await MriReportService.clearPatientLibraryReports(uid);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('saved_reports');
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          count > 0
+              ? 'Cleared $count report(s) from your history.'
+              : 'No reports found to clear.',
+        ),
+        backgroundColor: count > 0 ? Colors.green : Colors.blue,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -154,6 +239,13 @@ class _ReportsPageState extends State<ReportsPage> {
         title: const Text('Reports'),
         backgroundColor: kPrimaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Clear history',
+            onPressed: _confirmClearHistory,
+          ),
+        ],
       ),
       body: uid == null
           ? const Center(child: Text('Sign in to see your reports'))
@@ -203,6 +295,13 @@ class _ReportsPageState extends State<ReportsPage> {
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                tooltip: 'Delete report',
+                                onPressed: _isSharing
+                                    ? null
+                                    : () => _confirmDeleteReport(doc.id, title),
+                              ),
                               IconButton(
                                 icon: const Icon(Icons.share_outlined, color: kPrimaryColor),
                                 tooltip: 'Share with doctor',

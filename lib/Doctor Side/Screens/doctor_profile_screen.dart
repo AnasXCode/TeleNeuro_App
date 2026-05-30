@@ -1,8 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../Auth/doctor_login_page.dart';
+import '../../Widgets/profile_avatar.dart';
+import '../../Widgets/account_delete_dialog.dart';
+import '../../services/account_deletion_service.dart';
+import '../../services/profile_image_service.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -21,6 +28,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   String _specialization = "—";
   String _qualifications = "—";
   String _about = "—";
+  String? _photoUrl;
+  File? _pendingPhoto;
+  final ImagePicker _picker = ImagePicker();
 
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
@@ -46,6 +56,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           _specialization = data['speciality'] ?? data['specialization'] ?? "General Physician";
           _qualifications = data['qualifications'] ?? data['education'] ?? "—";
           _about = data['about'] ?? "—";
+          _photoUrl = (data['photoUrl'] as String?)?.trim();
+          if (_photoUrl != null && _photoUrl!.isEmpty) _photoUrl = null;
 
           // ✅ NEW RATING LOGIC
           int totalReviews = data['totalReviews'] ?? 0;
@@ -128,27 +140,49 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     );
   }
 
-  void _handleDeleteAccount(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Delete Account?", style: TextStyle(color: Colors.red)),
-        content: const Text("This will permanently remove your profile. This action cannot be undone."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              User? user = FirebaseAuth.instance.currentUser;
-              await FirebaseFirestore.instance.collection('users').doc(user!.uid).delete();
-              await user.delete();
-              if (!context.mounted) return;
-              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const DoctorLoginScreen()), (route) => false);
-            },
-            child: const Text("Delete", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+  Future<void> _pickProfilePhoto() async {
+    final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    setState(() => _pendingPhoto = File(picked.path));
+
+    final url = await ProfileImageService.uploadAndSaveProfilePhoto(
+      userId: currentUserId,
+      imageFile: _pendingPhoto!,
+    );
+    if (!mounted) return;
+    if (url != null) {
+      setState(() {
+        _photoUrl = url;
+        _pendingPhoto = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile photo updated'), backgroundColor: Colors.green),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not upload photo'), backgroundColor: Colors.orange),
+      );
+    }
+  }
+
+  void _handleDeleteAccount(BuildContext context) async {
+    final confirmed = await confirmAccountDeletion(context);
+    if (!confirmed || !context.mounted) return;
+
+    final error = await AccountDeletionService.deleteCurrentAccount();
+    if (!context.mounted) return;
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const DoctorLoginScreen()),
+      (route) => false,
     );
   }
 
@@ -165,7 +199,18 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             Center(
               child: Column(
                 children: [
-                  const CircleAvatar(radius: 50, backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.person, size: 60, color: Color(0xFF1565C0))),
+                  GestureDetector(
+                    onTap: _pickProfilePhoto,
+                    child: ProfileAvatar(
+                      userId: currentUserId,
+                      photoUrl: _photoUrl,
+                      localFile: _pendingPhoto,
+                      radius: 50,
+                      fallbackIcon: Icons.medical_services,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text('Tap photo to change', style: TextStyle(color: Colors.grey, fontSize: 12)),
                   const SizedBox(height: 15),
                   Text("Dr. $_name", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),

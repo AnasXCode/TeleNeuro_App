@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../Screens/doctor_profile_screen.dart';
+import '../../Widgets/profile_avatar.dart';
 import 'custom_buttons.dart';
 
 class DoctorCard extends StatelessWidget {
@@ -51,10 +52,10 @@ class DoctorCard extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircleAvatar(
+            ProfileAvatar(
+              userId: doctor['uid'],
               radius: 30,
-              backgroundColor: Color(0xFFE3F2FD),
-              child: Icon(Icons.person, color: kPrimaryColor, size: 30),
+              fallbackIcon: Icons.medical_services,
             ),
             const SizedBox(height: 8),
             Text(
