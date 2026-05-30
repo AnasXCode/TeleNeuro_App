@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// Note: Niche wali line check karein ke aapki chat_screen.dart kahan pari hai
 import '../../Patient Side/Screens/chat_screen.dart';
+import '../../services/notification_service.dart';
+import '../../Widgets/profile_view_screens.dart';
 
 class DoctorChatScreen extends StatelessWidget {
   const DoctorChatScreen({super.key});
 
-  // --- FUNCTION 1: END SESSION ---
   void _endSession(BuildContext context, String appointmentId, String patientName) {
     showDialog(
       context: context,
@@ -23,11 +23,33 @@ class DoctorChatScreen extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () async {
-              Navigator.pop(context); // Dialog band
-              await FirebaseFirestore.instance
+              Navigator.pop(context);
+              final apptDoc = await FirebaseFirestore.instance
                   .collection('appointments')
                   .doc(appointmentId)
-                  .update({'status': 'Completed'}); // Status change
+                  .get();
+              final apptData = apptDoc.data();
+              final patientId = (apptData?['patientId'] as String?) ?? '';
+              final doctorName = (apptData?['doctorName'] as String?) ?? 'Doctor';
+
+              await FirebaseFirestore.instance.collection('appointments').doc(appointmentId).update({
+                'status': 'Completed',
+                'completedAt': FieldValue.serverTimestamp(),
+              });
+
+              await NotificationService.addChatSystemMessage(
+                appointmentId: appointmentId,
+                message: 'This consultation has been marked as completed by the doctor.',
+              );
+
+              if (patientId.isNotEmpty) {
+                await NotificationService.notifySessionCompleted(
+                  patientId: patientId,
+                  doctorId: FirebaseAuth.instance.currentUser?.uid ?? '',
+                  doctorName: doctorName,
+                  appointmentId: appointmentId,
+                );
+              }
             },
             child: const Text("End Session", style: TextStyle(color: Colors.white)),
           ),
@@ -36,7 +58,6 @@ class DoctorChatScreen extends StatelessWidget {
     );
   }
 
-  // --- FUNCTION 2: DELETE CHAT (UPDATED - "Delete for Me") ---
   void _deleteChat(BuildContext context, String appointmentId) {
     showDialog(
       context: context,
@@ -51,9 +72,7 @@ class DoctorChatScreen extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              Navigator.pop(context); // Dialog band
-
-              // ✅ CHANGE: Delete nahi kar rahe, sirf Doctor ke liye 'Hide' kar rahe hain
+              Navigator.pop(context);
               await FirebaseFirestore.instance
                   .collection('appointments')
                   .doc(appointmentId)
@@ -62,6 +81,19 @@ class DoctorChatScreen extends StatelessWidget {
             child: const Text("Delete", style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openChat(BuildContext context, Map<String, dynamic> data, String docId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          receiverId: (data['patientId'] ?? '').toString(),
+          receiverName: (data['patientName'] ?? 'Patient').toString(),
+          appointmentId: docId,
+        ),
       ),
     );
   }
@@ -90,10 +122,8 @@ class DoctorChatScreen extends StatelessWidget {
 
           var allDocs = snapshot.data!.docs;
 
-          // ✅ FILTERING: Sirf wo chats dikhao jo Doctor ne delete NAHI ki hain
           var visibleDocs = allDocs.where((doc) {
             var data = doc.data() as Map<String, dynamic>;
-            // Agar 'doctorDeleted' true hai, to list mein mat dikhao
             return data['doctorDeleted'] != true;
           }).toList();
 
@@ -108,10 +138,22 @@ class DoctorChatScreen extends StatelessWidget {
               String docId = visibleDocs[index].id;
               String status = data['status'];
               bool isCompleted = status == 'Completed';
+              final patientId = (data['patientId'] ?? '').toString();
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: ListTile(
+                  onTap: () => _openChat(context, data, docId),
+                  onLongPress: patientId.isNotEmpty
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PatientProfileViewScreen(patientId: patientId),
+                            ),
+                          );
+                        }
+                      : null,
                   leading: CircleAvatar(
                     backgroundColor: isCompleted ? Colors.grey[300] : const Color(0xFFE3F2FD),
                     child: Icon(Icons.person, color: isCompleted ? Colors.grey : const Color(0xFF1565C0)),
@@ -121,39 +163,44 @@ class DoctorChatScreen extends StatelessWidget {
                       style: TextStyle(color: isCompleted ? Colors.grey : Colors.black)
                   ),
                   subtitle: Text(
-                      isCompleted ? "Session Ended" : "Active Session",
+                      isCompleted ? "Session Ended — tap to view" : "Active Session — tap to chat",
                       style: TextStyle(color: isCompleted ? Colors.red : Colors.green, fontSize: 12)
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Chat Button
-                      IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline, color: Colors.blue),
-                        onPressed: () {
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => ChatScreen(
-                                    receiverId: data['patientId'],
-                                    receiverName: data['patientName'],
-                                    appointmentId: docId,
-                                  )));
-                        },
-                      ),
-                      // Actions
-                      if (isCompleted)
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, color: Colors.red),
-                          onPressed: () => _deleteChat(context, docId),
+                  trailing: isCompleted
+                      ? Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.person_outline, color: Color(0xFF1565C0)),
+                              tooltip: 'Patient profile',
+                              onPressed: patientId.isEmpty
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => PatientProfileViewScreen(patientId: patientId),
+                                        ),
+                                      );
+                                    },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              onPressed: () => _deleteChat(context, docId),
+                            ),
+                          ],
                         )
-                      else
-                        IconButton(
-                          icon: const Icon(Icons.check_circle, color: Colors.green),
-                          onPressed: () => _endSession(context, docId, data['patientName']),
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.check_circle, color: Colors.green),
+                              tooltip: 'End session',
+                              onPressed: () => _endSession(context, docId, data['patientName'] ?? 'Patient'),
+                            ),
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                          ],
                         ),
-                    ],
-                  ),
                 ),
               );
             },

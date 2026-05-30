@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../services/user_profile_service.dart';
 
 // --- THEME COLORS ---
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -16,30 +19,43 @@ class ProfileDisplayPage extends StatefulWidget {
 }
 
 class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
-  String name="Loading...", email="", phone="", gender="", address="", bloodGroup="", dob="", emergency="", medicalConditions="";
+  String name = "Loading...", email = "", phone = "", gender = "", address = "", bloodGroup = "", dob = "", emergency = "", medicalConditions = "";
   File? profileImage;
+  bool _loading = true;
 
   @override void initState() { super.initState(); _loadDisplayData(); }
 
   Future<void> _loadDisplayData() async {
-    final prefs = await SharedPreferences.getInstance();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    final data = await UserProfileService.loadPatientProfile(uid);
+    if (!mounted) return;
     setState(() {
-      name = prefs.getString('name') ?? "Anas Ahmed";
-      email = prefs.getString('email') ?? "anas.ahmed@example.com";
-      phone = prefs.getString('phone') ?? "+92 300 1234567";
-      gender = prefs.getString('gender') ?? "Male";
-      address = prefs.getString('address') ?? "Taxila, Pakistan";
-      bloodGroup = prefs.getString('bloodGroup') ?? "B+";
-      dob = prefs.getString('dob') ?? "01/01/1980";
-      emergency = prefs.getString('emergency') ?? "+92 321 7654321";
-      medicalConditions = prefs.getString('conditions') ?? "None";
-      String? path = prefs.getString('imagePath');
-      if (path != null) profileImage = File(path);
+      name = data['name']?.toString() ?? 'Patient';
+      email = data['email']?.toString() ?? '—';
+      phone = data['phone']?.toString() ?? '—';
+      gender = data['gender']?.toString() ?? '—';
+      address = data['address']?.toString() ?? '—';
+      bloodGroup = data['bloodGroup']?.toString() ?? '—';
+      dob = data['dob']?.toString() ?? '—';
+      emergency = data['emergency']?.toString() ?? '—';
+      medicalConditions = data['medicalConditions']?.toString() ?? '—';
+      profileImage = data['profileImage'] as File?;
+      _loading = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("My Profile"), backgroundColor: kPrimaryColor),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -69,6 +85,8 @@ class _ProfileDisplayPageState extends State<ProfileDisplayPage> {
             Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kTextDark)),
             Text(email, style: const TextStyle(color: kTextLight)),
             const SizedBox(height: 30),
+            _infoTile(Icons.person_outline, "Full Name", name),
+            _infoTile(Icons.email_outlined, "Email", email),
             _infoTile(Icons.calendar_today, "Date of Birth", dob),
             _infoTile(Icons.person_outline, "Gender", gender),
             _infoTile(Icons.water_drop, "Blood Group", bloodGroup),
@@ -160,8 +178,26 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     await prefs.setString('bloodGroup', bloodGroup);
     if (_profileImage != null) await prefs.setString('imagePath', _profileImage!.path);
 
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      await UserProfileService.syncPatientProfileToFirestore(
+        uid: uid,
+        fields: {
+          'name': nameC.text,
+          'dob': dobC.text,
+          'phone': phoneC.text,
+          'email': emailC.text,
+          'address': addressC.text,
+          'emergency': emergencyC.text,
+          'medicalConditions': condC.text,
+          'gender': gender,
+          'bloodGroup': bloodGroup,
+        },
+      );
+    }
+
     if (!mounted) return;
-    Navigator.pop(context); // Go back to Display Page or Dashboard
+    Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account Updated"), backgroundColor: Colors.green));
   }
 

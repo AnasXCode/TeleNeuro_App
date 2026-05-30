@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../supabase_config.dart';
+import '../../services/notification_service.dart';
 
 /// Shared MRI report persistence and doctor sharing for the patient side.
 class MriReportService {
@@ -239,6 +240,15 @@ class MriReportService {
       'libraryDocId': libraryDocId,
       'createdAt': FieldValue.serverTimestamp(),
     });
+
+    final patientName = (reportData['patientName'] ?? 'Patient').toString();
+    await NotificationService.notifyMriReportShared(
+      doctorId: doctorId,
+      patientId: patientUid,
+      patientName: patientName,
+      reportId: reportId,
+      doctorName: doctorName,
+    );
 
     return ShareReportResult.success(doctorName);
   }

@@ -18,6 +18,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   String _rating = "Loading..."; // Default
   String _hospital = "Not Set";
   String _phone = "Not Set";
+  String _specialization = "—";
+  String _qualifications = "—";
+  String _about = "—";
 
   final String currentUserId = FirebaseAuth.instance.currentUser!.uid;
 
@@ -40,6 +43,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           _experience = data['experience'] ?? "0 Years";
           _hospital = data['hospital'] ?? "Not Set";
           _phone = data['phone'] ?? "Not Set";
+          _specialization = data['speciality'] ?? data['specialization'] ?? "General Physician";
+          _qualifications = data['qualifications'] ?? data['education'] ?? "—";
+          _about = data['about'] ?? "—";
 
           // ✅ NEW RATING LOGIC
           int totalReviews = data['totalReviews'] ?? 0;
@@ -162,6 +168,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   const CircleAvatar(radius: 50, backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.person, size: 60, color: Color(0xFF1565C0))),
                   const SizedBox(height: 15),
                   Text("Dr. $_name", style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(_specialization, style: const TextStyle(color: Colors.grey, fontSize: 15)),
                 ],
               ),
             ),
@@ -169,8 +177,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
 
             _buildProfileTile(Icons.email, "Email", _email),
             _buildProfileTile(Icons.phone, "Phone", _phone),
+            _buildProfileTile(Icons.medical_services, "Specialization", _specialization),
+            _buildProfileTile(Icons.school, "Qualifications", _qualifications),
             _buildProfileTile(Icons.local_hospital, "Hospital", _hospital),
-            _buildProfileTile(Icons.star, "Rating", _rating), // ✅ CHANGED: Ab direct _rating variable pass ho raha hai
+            _buildProfileTile(Icons.star, "Rating", _rating),
 
             Card(
               margin: const EdgeInsets.only(bottom: 20),
@@ -184,6 +194,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 ),
               ),
             ),
+
+            if (_about != "—") ...[
+              const SizedBox(height: 8),
+              _buildProfileTile(Icons.info_outline, "About", _about),
+            ],
 
             // PATIENT REVIEWS SECTION
             const Divider(thickness: 1.5),

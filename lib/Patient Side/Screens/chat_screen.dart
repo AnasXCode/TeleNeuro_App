@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../services/active_chat_tracker.dart';
+import '../../services/notification_service.dart';
+import '../../Widgets/profile_view_screens.dart';
+
 // ====================================================
 // PART 1: PATIENT MESSAGES LIST
 // ====================================================
@@ -35,6 +39,19 @@ class PatientChatScreen extends StatelessWidget {
             child: const Text("Delete", style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openChat(BuildContext context, Map<String, dynamic> data, String docId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatScreen(
+          receiverId: (data['doctorId'] ?? '').toString(),
+          receiverName: "Dr. ${data['doctorName']}",
+          appointmentId: docId,
+        ),
       ),
     );
   }
@@ -84,6 +101,7 @@ class PatientChatScreen extends StatelessWidget {
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 child: ListTile(
+                  onTap: () => _openChat(context, data, docId),
                   leading: CircleAvatar(
                     backgroundColor: isCompleted ? Colors.grey[300] : const Color(0xFFE3F2FD),
                     child: Icon(Icons.medical_services, color: isCompleted ? Colors.grey : const Color(0xFF1565C0)),
@@ -96,26 +114,12 @@ class PatientChatScreen extends StatelessWidget {
                     isCompleted ? "Consultation Ended" : "Tap to chat",
                     style: TextStyle(color: isCompleted ? Colors.red : Colors.green),
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.chat_bubble, color: Colors.blue),
-                        onPressed: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => ChatScreen(
-                            receiverId: data['doctorId'],
-                            receiverName: "Dr. ${data['doctorName']}",
-                            appointmentId: docId,
-                          )));
-                        },
-                      ),
-                      if (isCompleted)
-                        IconButton(
+                  trailing: isCompleted
+                      ? IconButton(
                           icon: const Icon(Icons.delete_outline, color: Colors.grey),
                           onPressed: () => _deleteChat(context, docId),
-                        ),
-                    ],
-                  ),
+                        )
+                      : const Icon(Icons.chevron_right, color: Colors.grey),
                 ),
               );
             },
@@ -150,6 +154,25 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  @override
+  void initState() {
+    super.initState();
+    ActiveChatTracker.setActive(
+      widget.appointmentId,
+      userId: _auth.currentUser?.uid,
+    );
+  }
+
+  @override
+  void dispose() {
+    if (ActiveChatTracker.activeAppointmentId == widget.appointmentId &&
+        ActiveChatTracker.activeUserId == _auth.currentUser?.uid) {
+      ActiveChatTracker.setActive(null);
+    }
+    _messageController.dispose();
+    super.dispose();
+  }
+
   String _formatTime(Timestamp? timestamp) {
     if (timestamp == null) return "";
     DateTime date = timestamp.toDate();
@@ -179,7 +202,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     String currentUserId = _auth.currentUser!.uid;
 
-    await FirebaseFirestore.instance
+    final messageRef = await FirebaseFirestore.instance
         .collection('chat_rooms')
         .doc(widget.appointmentId)
         .collection('messages')
@@ -190,6 +213,136 @@ class _ChatScreenState extends State<ChatScreen> {
       "time": FieldValue.serverTimestamp(),
       "isRead": false,
     });
+
+    final apptDoc = await FirebaseFirestore.instance
+        .collection('appointments')
+        .doc(widget.appointmentId)
+        .get();
+    final apptData = apptDoc.data();
+
+    String recipientId = widget.receiverId;
+    String senderName = 'User';
+    if (apptData != null) {
+      final patientId = (apptData['patientId'] ?? '').toString();
+      final doctorId = (apptData['doctorId'] ?? '').toString();
+      final isPatient = currentUserId == patientId;
+      if (isPatient) {
+        recipientId = doctorId.isNotEmpty ? doctorId : recipientId;
+        senderName = (apptData['patientName'] ?? 'Patient').toString();
+      } else {
+        recipientId = patientId.isNotEmpty ? patientId : recipientId;
+        senderName = 'Dr. ${apptData['doctorName'] ?? 'Doctor'}';
+      }
+    }
+
+    if (recipientId.isEmpty) return;
+
+    await NotificationService.notifyChatMessage(
+      recipientId: recipientId,
+      senderId: currentUserId,
+      senderName: senderName,
+      appointmentId: widget.appointmentId,
+      messageId: messageRef.id,
+      messagePreview: msg,
+    );
+  }
+
+  void _openPeerProfile(BuildContext context, Map<String, dynamic>? apptData) {
+    if (apptData == null) return;
+    final uid = _auth.currentUser?.uid ?? '';
+    final patientId = (apptData['patientId'] ?? '').toString();
+    final doctorId = (apptData['doctorId'] ?? '').toString();
+    if (uid == patientId && doctorId.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DoctorProfileViewScreen(doctorId: doctorId),
+        ),
+      );
+    } else if (uid == doctorId && patientId.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PatientProfileViewScreen(patientId: patientId),
+        ),
+      );
+    }
+  }
+
+  Widget _systemMessageBubble(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade400),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.info_outline, size: 16, color: Colors.grey.shade700),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade800,
+                    fontStyle: FontStyle.italic,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _chatMessageBubble(Map<String, dynamic> data, bool isMe) {
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isMe ? const Color(0xFF1565C0) : Colors.grey[300],
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              data['message'] ?? '',
+              style: TextStyle(color: isMe ? Colors.white : Colors.black),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _formatTime(data['time']),
+                  style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.black54),
+                ),
+                if (isMe) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.done_all,
+                    size: 15,
+                    color: (data['isRead'] ?? false) ? Colors.lightBlueAccent : Colors.white60,
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -206,129 +359,106 @@ class _ChatScreenState extends State<ChatScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.receiverName),
-        backgroundColor: const Color(0xFF1565C0),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('chat_rooms')
-                  .doc(widget.appointmentId)
-                  .collection('messages')
-                  .orderBy('time', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("Say Hello! 👋"));
-                }
-                return ListView.builder(
-                  reverse: true,
-                  itemCount: snapshot.data!.docs.length,
-                  itemBuilder: (context, index) {
-                    var doc = snapshot.data!.docs[index];
-                    var data = doc.data() as Map<String, dynamic>;
-                    bool isMe = data['senderId'] == currentUserId;
-                    _markMessageAsRead(doc);
-
-                    return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isMe ? const Color(0xFF1565C0) : Colors.grey[300],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              data['message'],
-                              style: TextStyle(color: isMe ? Colors.white : Colors.black),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  _formatTime(data['time']),
-                                  style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.black54),
-                                ),
-                                if (isMe) ...[
-                                  const SizedBox(width: 4),
-                                  Icon(
-                                    Icons.done_all,
-                                    size: 15,
-                                    color: (data['isRead'] ?? false) ? Colors.lightBlueAccent : Colors.white60,
-                                  )
-                                ]
-                              ],
-                            )
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          StreamBuilder<DocumentSnapshot>(
-            stream: FirebaseFirestore.instance
+        title: GestureDetector(
+          onTap: () {
+            FirebaseFirestore.instance
                 .collection('appointments')
                 .doc(widget.appointmentId)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox();
-              var data = snapshot.data!.data() as Map<String, dynamic>?;
-              String status = data?['status'] ?? 'Completed';
+                .get()
+                .then((snap) {
+              if (context.mounted) _openPeerProfile(context, snap.data());
+            });
+          },
+          child: Text(widget.receiverName),
+        ),
+        backgroundColor: const Color(0xFF1565C0),
+      ),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('appointments')
+            .doc(widget.appointmentId)
+            .snapshots(),
+        builder: (context, apptSnap) {
+          final apptData = apptSnap.data?.data() as Map<String, dynamic>?;
+          final status = apptData?['status'] ?? 'Accepted';
+          final doctorId = apptData?['doctorId'] ?? '';
+          final isDoctor = currentUserId == doctorId;
+          final isCompleted = status == 'Completed';
 
-              // ✅ NEW: Check karo ke user Doctor hai ya Patient
-              String doctorId = data?['doctorId'] ?? "";
-              bool isDoctor = (currentUserId == doctorId);
+          return Column(
+            children: [
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('chat_rooms')
+                      .doc(widget.appointmentId)
+                      .collection('messages')
+                      .orderBy('time', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    final docs = snapshot.data?.docs ?? [];
+                    if (docs.isEmpty && !isCompleted) {
+                      return const Center(child: Text("Say Hello! 👋"));
+                    }
 
-              // ✅ Agar Status Completed hai
-              if (status == 'Completed') {
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(15),
-                  color: Colors.red.withOpacity(0.1),
-                  child: Text(
-                    // ✅ Agar Doctor hai to alag message, Patient hai to alag
-                    isDoctor
-                        ? "This session is marked as Completed."
-                        : "Consultation Ended. Book a new appointment to chat.",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                  ),
-                );
-              }
+                    final itemCount = docs.length + (isCompleted ? 1 : 0);
 
-              return Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _messageController,
-                        decoration: const InputDecoration(
-                          hintText: "Type a message...",
-                          border: OutlineInputBorder(),
+                    return ListView.builder(
+                      reverse: true,
+                      padding: const EdgeInsets.only(bottom: 8, top: 8),
+                      itemCount: itemCount,
+                      itemBuilder: (context, index) {
+                        if (isCompleted && index == docs.length) {
+                          return _systemMessageBubble(
+                            isDoctor
+                                ? 'This consultation has been marked as completed.'
+                                : 'This consultation has ended. Book a new appointment to chat again.',
+                          );
+                        }
+
+                        var doc = docs[index];
+                        var data = doc.data() as Map<String, dynamic>;
+
+                        if (data['type'] == 'system') {
+                          return _systemMessageBubble(
+                            (data['message'] ?? '').toString(),
+                          );
+                        }
+
+                        bool isMe = data['senderId'] == currentUserId;
+                        if (!isMe) _markMessageAsRead(doc);
+
+                        return _chatMessageBubble(data, isMe);
+                      },
+                    );
+                  },
+                ),
+              ),
+              if (!isCompleted)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _messageController,
+                          decoration: const InputDecoration(
+                            hintText: "Type a message...",
+                            border: OutlineInputBorder(),
+                          ),
+                          onSubmitted: (_) => sendMessage(),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.send, color: Color(0xFF1565C0)),
-                      onPressed: sendMessage,
-                    ),
-                  ],
+                      IconButton(
+                        icon: const Icon(Icons.send, color: Color(0xFF1565C0)),
+                        onPressed: sendMessage,
+                      ),
+                    ],
+                  ),
                 ),
-              );
-            },
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../services/notification_service.dart';
+
 class ConsultDoctorPage extends StatefulWidget {
   // ✅ 1. Yahan humne parameters add kiye taake Dashboard se Data le sakein
   final String doctorId;
@@ -142,7 +144,7 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
       }
 
       // Firestore mein Save karna
-      await FirebaseFirestore.instance.collection('appointments').add({
+      final appointmentRef = await FirebaseFirestore.instance.collection('appointments').add({
         'patientId': user.uid,
         'patientName': patientName,
         'doctorId': widget.doctorId,
@@ -154,6 +156,15 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         'status': 'Pending', // Shuru mein Pending rahega
         'timestamp': FieldValue.serverTimestamp(),
       });
+
+      await NotificationService.notifyAppointmentBooked(
+        doctorId: widget.doctorId,
+        patientId: user.uid,
+        patientName: patientName,
+        appointmentId: appointmentRef.id,
+        date: "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}",
+        time: _selectedTime!.format(context),
+      );
 
       if (!mounted) return;
 
@@ -286,6 +297,7 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                 onPressed: _isLoading ? null : _bookAppointment,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
@@ -293,7 +305,9 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text("Book Appointment",
                     style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold)),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
               ),
             ),
           ],

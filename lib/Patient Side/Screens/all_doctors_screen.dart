@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'consult_doctor_screen.dart';
+import '../../Widgets/profile_view_screens.dart';
 
 // Colors
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -66,9 +67,10 @@ class AllDoctorsScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ConsultDoctorPage(
+                      builder: (context) => DoctorProfileViewScreen(
                         doctorId: docId,
-                        doctorName: data['name'] ?? 'Doctor',
+                        showPatientActions: true,
+                        doctorDisplayName: data['name'] ?? 'Doctor',
                       ),
                     ),
                   );

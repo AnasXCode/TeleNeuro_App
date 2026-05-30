@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../Widgets/profile_view_screens.dart';
+
 class MyPatientsScreen extends StatefulWidget {
   const MyPatientsScreen({super.key});
 
@@ -89,11 +91,23 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
             itemBuilder: (context, index) {
               final patient = patientList[index];
 
+              final patientId = (patient['patientId'] ?? '').toString();
+
               return Card(
                 elevation: 2,
                 margin: const EdgeInsets.only(bottom: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
+                  onTap: patientId.isEmpty
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PatientProfileViewScreen(patientId: patientId),
+                            ),
+                          );
+                        },
                   leading: const CircleAvatar(
                     backgroundColor: Color(0xFFE3F2FD),
                     child: Icon(Icons.person, color: Color(0xFF1565C0)),

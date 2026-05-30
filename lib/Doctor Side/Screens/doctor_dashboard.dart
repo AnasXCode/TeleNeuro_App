@@ -11,6 +11,7 @@ import 'doctor_mri_reports_screen.dart';
 import 'my_patients_screen.dart';
 import 'doctor_chat_screen.dart';
 import 'doctor_profile_screen.dart';
+import '../../Widgets/notifications_screen.dart';
 
 class DoctorDashboard extends StatefulWidget {
   const DoctorDashboard({super.key});
@@ -185,7 +186,13 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
         backgroundColor: const Color(0xFF1565C0),
         elevation: 0,
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.notifications)),
+          NotificationBadgeIcon(
+            iconColor: Colors.white,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            ),
+          ),
         ],
       ),
       body: SingleChildScrollView(

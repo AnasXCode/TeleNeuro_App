@@ -10,7 +10,7 @@ import '../Auth/patient_portal.dart';
 // --- SCREENS IMPORTS ---
 import 'appointments_screen.dart';
 import 'chat_screen.dart';
-import 'consult_doctor_screen.dart';
+import '../../Widgets/profile_view_screens.dart';
 import 'patient_profile_screen.dart';
 import 'reports_screen.dart';
 import 'all_doctors_screen.dart';
@@ -18,6 +18,7 @@ import 'mri_upload_screen.dart';
 
 // --- WIDGETS ---
 import '../Widgets/category_card.dart';
+import '../../Widgets/notifications_screen.dart';
 
 // GLOBAL COLORS
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -140,11 +141,29 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   const Text('Find your Specialist', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kTextDark)),
                 ],
               ),
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: kAccentColor,
-                backgroundImage: _dashboardProfileImage != null ? FileImage(_dashboardProfileImage!) : null,
-                child: _dashboardProfileImage == null ? const Icon(Icons.person, color: kPrimaryColor) : null,
+              NotificationBadgeIcon(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ProfileDisplayPage()),
+                  ).then((_) {
+                    _loadDashboardImage();
+                    _fetchUserName();
+                  });
+                },
+                child: CircleAvatar(
+                  radius: 20,
+                  backgroundColor: kAccentColor,
+                  backgroundImage: _dashboardProfileImage != null ? FileImage(_dashboardProfileImage!) : null,
+                  child: _dashboardProfileImage == null ? const Icon(Icons.person, color: kPrimaryColor) : null,
+                ),
               ),
             ],
           ),
@@ -229,7 +248,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     String ratingDisplay = totalReviews == 0 ? "New" : (data?['rating'] ?? 0.0).toString();
 
                     return GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => ConsultDoctorPage(doctorId: docId, doctorName: name))),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (c) => DoctorProfileViewScreen(
+                            doctorId: docId,
+                            showPatientActions: true,
+                            doctorDisplayName: name,
+                          ),
+                        ),
+                      ),
                       child: Container(
                         width: 150,
                         margin: const EdgeInsets.only(right: 15, bottom: 5, top: 5),
