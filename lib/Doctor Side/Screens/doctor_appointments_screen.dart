@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 // Ensure correct paths
 import '../Widgets/appointment_card.dart';
 import '../Widgets/request_card.dart';
+import '../../services/notification_service.dart';
 
 class DoctorAppointmentsScreen extends StatefulWidget {
   final VoidCallback onBack; // ✅ Naya callback add kiya gaya hai
@@ -19,19 +20,38 @@ class _DoctorAppointmentsScreenState extends State<DoctorAppointmentsScreen> {
 
   // ✅ Status Update Function
   Future<void> _updateStatus(String docId, String newStatus) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
+      final apptSnap = await FirebaseFirestore.instance.collection('appointments').doc(docId).get();
+      final apptData = apptSnap.data();
+
       await FirebaseFirestore.instance
           .collection('appointments')
           .doc(docId)
           .update({'status': newStatus});
 
+      if (newStatus == 'Accepted' && apptData != null && user != null) {
+        await NotificationService.notifyAppointmentAccepted(
+          patientId: (apptData['patientId'] ?? '').toString(),
+          doctorId: user!.uid,
+          doctorName: (apptData['doctorName'] ?? 'Doctor').toString(),
+          appointmentId: docId,
+          date: (apptData['date'] ?? '').toString(),
+          time: (apptData['time'] ?? '').toString(),
+        );
+      }
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      messenger.showSnackBar(SnackBar(
         content: Text("Request $newStatus"),
         backgroundColor: newStatus == 'Accepted' ? Colors.green : Colors.red,
       ));
     } catch (e) {
-      print("Error updating status: $e");
+      debugPrint("Error updating status: $e");
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 

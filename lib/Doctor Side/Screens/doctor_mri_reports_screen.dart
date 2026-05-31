@@ -33,9 +33,12 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
       );
       return;
     }
+
     final uri = Uri.parse(url);
     final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!context.mounted) return;
+
+    if (!context.mounted) return; // ✅ Fix: context.mounted lagaya
+
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open the link')),
@@ -44,19 +47,19 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
   }
 
   Future<void> _confirmDeleteReport(
-    BuildContext context,
-    String documentId,
-    String reportLabel,
-    Set<String> linkedPatientIds,
-    String doctorId,
-  ) async {
+      BuildContext context,
+      String documentId,
+      String reportLabel,
+      Set<String> linkedPatientIds,
+      String doctorId,
+      ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Remove report?'),
         content: Text(
           'Remove "$reportLabel" from your patient MRI reports list? '
-          'The patient keeps their copy in Lab Reports.',
+              'The patient keeps their copy in Lab Reports.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -69,7 +72,7 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !context.mounted) return; // ✅ Fix: !mounted ki jagah !context.mounted
 
     setState(() => _isDeleting = true);
     try {
@@ -78,7 +81,9 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
         documentId: documentId,
         linkedPatientIds: linkedPatientIds,
       );
-      if (!mounted) return;
+
+      if (!context.mounted) return; // ✅ Fix: !mounted ki jagah !context.mounted
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -90,7 +95,7 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isDeleting = false);
+      if (mounted) setState(() => _isDeleting = false); // Yahan mounted theek hai kyunki ye bas setState ke liye hai
     }
   }
 
@@ -152,18 +157,18 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
   }
 
   Future<void> _confirmClearAllReports(
-    BuildContext context,
-    String doctorId,
-    Set<String> linkedPatientIds,
-  ) async {
+      BuildContext context,
+      String doctorId,
+      Set<String> linkedPatientIds,
+      ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Clear all patient MRI reports?'),
         content: const Text(
           'This removes every report from your patient MRI reports list. '
-          'Patients keep their copies in Lab Reports.\n\n'
-          'This cannot be undone.',
+              'Patients keep their copies in Lab Reports.\n\n'
+              'This cannot be undone.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -176,7 +181,7 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !context.mounted) return; // ✅ Fix: !mounted ki jagah !context.mounted
 
     setState(() => _isDeleting = true);
     try {
@@ -184,7 +189,9 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
         doctorId: doctorId,
         linkedPatientIds: linkedPatientIds,
       );
-      if (!mounted) return;
+
+      if (!context.mounted) return; // ✅ Fix: !mounted ki jagah !context.mounted
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -196,7 +203,7 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _isDeleting = false);
+      if (mounted) setState(() => _isDeleting = false); // Yahan mounted theek hai kyunki ye bas setState ke liye hai
     }
   }
 
@@ -217,187 +224,187 @@ class _DoctorMriReportsScreenState extends State<DoctorMriReportsScreen> {
             onPressed: _isDeleting || doctorId == null
                 ? null
                 : () {
-                    FirebaseFirestore.instance
-                        .collection('appointments')
-                        .where('doctorId', isEqualTo: doctorId)
-                        .where('status', whereIn: ['Accepted', 'Completed'])
-                        .get()
-                        .then((snap) {
-                      final patientIds = <String>{};
-                      for (final d in snap.docs) {
-                        final pid = d.data()['patientId'] as String?;
-                        if (pid != null && pid.isNotEmpty) patientIds.add(pid);
-                      }
-                      if (context.mounted) {
-                        _confirmClearAllReports(context, doctorId, patientIds);
-                      }
-                    });
-                  },
+              FirebaseFirestore.instance
+                  .collection('appointments')
+                  .where('doctorId', isEqualTo: doctorId)
+                  .where('status', whereIn: ['Accepted', 'Completed'])
+                  .get()
+                  .then((snap) {
+                final patientIds = <String>{};
+                for (final d in snap.docs) {
+                  final pid = d.data()['patientId'] as String?;
+                  if (pid != null && pid.isNotEmpty) patientIds.add(pid);
+                }
+                if (context.mounted) {
+                  _confirmClearAllReports(context, doctorId, patientIds);
+                }
+              });
+            },
           ),
         ],
       ),
       body: doctorId == null
           ? const Center(child: Text('Please sign in'))
           : Stack(
-              children: [
-                StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                  stream: FirebaseFirestore.instance
-                      .collection('appointments')
-                      .where('doctorId', isEqualTo: doctorId)
-                      .where('status', whereIn: ['Accepted', 'Completed'])
-                      .snapshots(),
-                  builder: (context, apptSnap) {
-                    if (apptSnap.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
+        children: [
+          StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collection('appointments')
+                .where('doctorId', isEqualTo: doctorId)
+                .where('status', whereIn: ['Accepted', 'Completed'])
+                .snapshots(),
+            builder: (context, apptSnap) {
+              if (apptSnap.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                    final patientIds = <String>{};
-                    for (final d in apptSnap.data?.docs ?? []) {
-                      final pid = d.data()['patientId'] as String?;
-                      if (pid != null && pid.isNotEmpty) patientIds.add(pid);
-                    }
+              final patientIds = <String>{};
+              for (final d in apptSnap.data?.docs ?? []) {
+                final pid = d.data()['patientId'] as String?;
+                if (pid != null && pid.isNotEmpty) patientIds.add(pid);
+              }
 
-                    if (patientIds.isEmpty) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.folder_off_outlined, size: 64, color: Colors.grey.shade400),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No linked patients yet',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Accept or complete appointments first. Reports appear here when patients share them.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                            ],
+              if (patientIds.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.folder_off_outlined, size: 64, color: Colors.grey.shade400),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No linked patients yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
                           ),
                         ),
-                      );
-                    }
-
-                    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: FirebaseFirestore.instance
-                          .collection('mri_reports')
-                          .orderBy('createdAt', descending: true)
-                          .limit(100)
-                          .snapshots(),
-                      builder: (context, reportSnap) {
-                        if (reportSnap.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        if (!reportSnap.hasData) {
-                          return const Center(child: Text('No reports yet'));
-                        }
-
-                        final reports = reportSnap.data!.docs.where((doc) {
-                          return MriReportService.isDoctorVisibleReport(
-                            doc.data(),
-                            doctorId,
-                            patientIds,
-                          );
-                        }).toList();
-
-                        if (reports.isEmpty) {
-                          return Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                'No MRI reports yet.\nThey appear when a linked patient shares a report with you.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                            ),
-                          );
-                        }
-
-                        return ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: reports.length,
-                          itemBuilder: (context, i) {
-                            final doc = reports[i];
-                            final data = doc.data();
-                            final name = (data['patientName'] ?? 'Patient').toString();
-                            final stage = (data['stage'] ?? '—').toString();
-                            final conf = (data['confidence'] ?? '—').toString();
-                            final reportId = (data['reportId'] ?? doc.id).toString();
-                            final pdfUrl = (data['pdfUrl'] ?? '').toString();
-                            final patientUid = (data['patientUid'] ?? '').toString();
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                leading: ProfileAvatar(
-                                  userId: patientUid.isNotEmpty ? patientUid : null,
-                                  radius: 26,
-                                  fallbackIcon: Icons.person,
-                                ),
-                                title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 6),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('Stage: $stage'),
-                                      Text('Confidence: $conf'),
-                                      Text('ID: $reportId', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text(_formatTime(data['createdAt']), style: const TextStyle(fontSize: 12)),
-                                    ],
-                                  ),
-                                ),
-                                isThreeLine: true,
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                      tooltip: 'Remove from my list',
-                                      onPressed: _isDeleting
-                                          ? null
-                                          : () => _confirmDeleteReport(
-                                                context,
-                                                doc.id,
-                                                reportId,
-                                                patientIds,
-                                                doctorId,
-                                              ),
-                                    ),
-                                    if (pdfUrl.isNotEmpty)
-                                      IconButton(
-                                        icon: const Icon(Icons.picture_as_pdf, color: Color(0xFFC62828)),
-                                        tooltip: 'Open PDF',
-                                        onPressed: () => _openLink(context, pdfUrl),
-                                      ),
-                                  ],
-                                ),
-                                onTap: () => _showDetail(context, data, reportId),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
-                if (_isDeleting)
-                  Container(
-                    color: Colors.black26,
-                    child: const Center(child: CircularProgressIndicator()),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Accept or complete appointments first. Reports appear here when patients share them.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
                   ),
-              ],
+                );
+              }
+
+              return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('mri_reports')
+                    .orderBy('createdAt', descending: true)
+                    .limit(100)
+                    .snapshots(),
+                builder: (context, reportSnap) {
+                  if (reportSnap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!reportSnap.hasData) {
+                    return const Center(child: Text('No reports yet'));
+                  }
+
+                  final reports = reportSnap.data!.docs.where((doc) {
+                    return MriReportService.isDoctorVisibleReport(
+                      doc.data(),
+                      doctorId,
+                      patientIds,
+                    );
+                  }).toList();
+
+                  if (reports.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'No MRI reports yet.\nThey appear when a linked patient shares a report with you.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: reports.length,
+                    itemBuilder: (context, i) {
+                      final doc = reports[i];
+                      final data = doc.data();
+                      final name = (data['patientName'] ?? 'Patient').toString();
+                      final stage = (data['stage'] ?? '—').toString();
+                      final conf = (data['confidence'] ?? '—').toString();
+                      final reportId = (data['reportId'] ?? doc.id).toString();
+                      final pdfUrl = (data['pdfUrl'] ?? '').toString();
+                      final patientUid = (data['patientUid'] ?? '').toString();
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          leading: ProfileAvatar(
+                            userId: patientUid.isNotEmpty ? patientUid : null,
+                            radius: 26,
+                            fallbackIcon: Icons.person,
+                          ),
+                          title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Stage: $stage'),
+                                Text('Confidence: $conf'),
+                                Text('ID: $reportId', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                Text(_formatTime(data['createdAt']), style: const TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          isThreeLine: true,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                tooltip: 'Remove from my list',
+                                onPressed: _isDeleting
+                                    ? null
+                                    : () => _confirmDeleteReport(
+                                  context,
+                                  doc.id,
+                                  reportId,
+                                  patientIds,
+                                  doctorId,
+                                ),
+                              ),
+                              if (pdfUrl.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.picture_as_pdf, color: Color(0xFFC62828)),
+                                  tooltip: 'Open PDF',
+                                  onPressed: () => _openLink(context, pdfUrl),
+                                ),
+                            ],
+                          ),
+                          onTap: () => _showDetail(context, data, reportId),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+          if (_isDeleting)
+            Container(
+              color: Colors.black26,
+              child: const Center(child: CircularProgressIndicator()),
             ),
+        ],
+      ),
     );
   }
 }

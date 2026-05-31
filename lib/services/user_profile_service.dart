@@ -103,4 +103,18 @@ class UserProfileService {
       );
     } catch (_) {}
   }
+
+  static Future<void> syncDoctorProfileToFirestore({
+    required String uid,
+    required Map<String, dynamic> fields,
+  }) async {
+    await FirebaseFirestore.instance.collection('users').doc(uid).set(
+      {
+        ...fields,
+        'role': 'Doctor',
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
 }

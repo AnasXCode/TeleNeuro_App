@@ -23,7 +23,7 @@ class StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.1), // Agar error aye to .withValues(alpha: 0.1) use karein
+            color: color.withValues(alpha: 0.1), // Agar error aye to .withValues(alpha: 0.1) use karein
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -35,7 +35,7 @@ class StatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 24),

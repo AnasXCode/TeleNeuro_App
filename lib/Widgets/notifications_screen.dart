@@ -79,87 +79,88 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       appBar: useAppBar
           ? AppBar(
-              title: const Text('Notifications'),
-              backgroundColor: _kPrimary,
-              foregroundColor: Colors.white,
-              automaticallyImplyLeading: !widget.embeddedInTab,
-              actions: [
-                if (uid != null)
-                  TextButton(
-                    onPressed: _markAllRead,
-                    child: const Text('Mark all read', style: TextStyle(color: Colors.white)),
-                  ),
-              ],
-            )
+        title: const Text('Notifications'),
+        backgroundColor: _kPrimary,
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: !widget.embeddedInTab,
+        actions: [
+          if (uid != null)
+            TextButton(
+              onPressed: _markAllRead,
+              child: const Text('Mark all read', style: TextStyle(color: Colors.white)),
+            ),
+        ],
+      )
           : null,
       body: uid == null
           ? const Center(child: Text('Please sign in'))
           : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: NotificationService.notificationsStream(uid),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+        stream: NotificationService.notificationsStream(uid),
+        builder: (context, snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-                final docs = (snap.data?.docs ?? []).toList()
-                  ..sort((a, b) {
-                    final ta = a.data()['createdAt'];
-                    final tb = b.data()['createdAt'];
-                    if (ta is! Timestamp) return 1;
-                    if (tb is! Timestamp) return -1;
-                    return tb.compareTo(ta);
-                  });
-                if (docs.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No notifications yet.',
-                      style: TextStyle(color: Colors.grey.shade600),
+          final docs = (snap.data?.docs ?? []).toList()
+            ..sort((a, b) {
+              final ta = a.data()['createdAt'];
+              final tb = b.data()['createdAt'];
+              if (ta is! Timestamp) return 1;
+              if (tb is! Timestamp) return -1;
+              return tb.compareTo(ta);
+            });
+          if (docs.isEmpty) {
+            return Center(
+              child: Text(
+                'No notifications yet.',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            );
+          }
+
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: docs.length,
+            // ✅ Linter fix: (_, __) ki jagah (context, index) use kiya
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final doc = docs[i];
+              final data = doc.data();
+              final read = data['read'] == true;
+              final title = (data['title'] ?? 'Notification').toString();
+              final body = (data['body'] ?? '').toString();
+              final type = data['type'] as String?;
+
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: read ? Colors.grey.shade200 : const Color(0xFFE3F2FD),
+                  child: Icon(
+                    _iconForType(type),
+                    color: read ? Colors.grey : _kPrimary,
+                  ),
+                ),
+                title: Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: read ? FontWeight.normal : FontWeight.bold,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (body.isNotEmpty) Text(body),
+                    Text(
+                      _formatTime(data['createdAt']),
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
-                  );
-                }
-
-                return ListView.separated(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: docs.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, i) {
-                    final doc = docs[i];
-                    final data = doc.data();
-                    final read = data['read'] == true;
-                    final title = (data['title'] ?? 'Notification').toString();
-                    final body = (data['body'] ?? '').toString();
-                    final type = data['type'] as String?;
-
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: read ? Colors.grey.shade200 : const Color(0xFFE3F2FD),
-                        child: Icon(
-                          _iconForType(type),
-                          color: read ? Colors.grey : _kPrimary,
-                        ),
-                      ),
-                      title: Text(
-                        title,
-                        style: TextStyle(
-                          fontWeight: read ? FontWeight.normal : FontWeight.bold,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (body.isNotEmpty) Text(body),
-                          Text(
-                            _formatTime(data['createdAt']),
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
-                      onTap: () => NotificationService.markAsRead(doc.id),
-                    );
-                  },
-                );
-              },
-            ),
+                  ],
+                ),
+                onTap: () => NotificationService.markAsRead(doc.id),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

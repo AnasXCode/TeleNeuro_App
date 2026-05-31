@@ -79,6 +79,12 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
       return;
     }
 
+    // ✅ Linter Fix: Context aur formatting variables ko await se pehle capture kar liya
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    final String formattedTime = _selectedTime!.format(context);
+    final String formattedDate = "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}";
+
     setState(() => _isLoading = true);
 
     try {
@@ -120,13 +126,13 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
       if (hasActiveSession) {
         if (mounted) {
           setState(() => _isLoading = false); // Loading band
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(statusMessage),
-              backgroundColor: Colors.orange,
-            ),
-          );
         }
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(statusMessage),
+            backgroundColor: Colors.orange,
+          ),
+        );
         return; // ❌ Code yahan ruk jayega, booking nahi hogi
       }
 
@@ -151,9 +157,8 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         'doctorId': widget.doctorId,
         'doctorName': widget.doctorName,
         'problem': _problemController.text.trim(),
-        'date':
-        "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}",
-        'time': _selectedTime!.format(context),
+        'date': formattedDate,
+        'time': formattedTime,
         'status': 'Pending', // Shuru mein Pending rahega
         'timestamp': FieldValue.serverTimestamp(),
       });
@@ -163,23 +168,21 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         patientId: user.uid,
         patientName: patientName,
         appointmentId: appointmentRef.id,
-        date: "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}",
-        time: _selectedTime!.format(context),
+        date: formattedDate,
+        time: formattedTime,
       );
 
-      if (!mounted) return;
-
       // Success Message
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
             content: Text('Appointment Request Sent!'),
             backgroundColor: Colors.green),
       );
 
-      Navigator.pop(context); // Wapis Dashboard par chale jayen
+      nav.pop(); // Wapis Dashboard par chale jayen
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     } finally {

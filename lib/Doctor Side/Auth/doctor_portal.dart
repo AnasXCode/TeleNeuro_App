@@ -48,7 +48,7 @@ class DoctorPortalScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       )
@@ -87,7 +87,7 @@ class DoctorPortalScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     height: 1.5,
                   ),
                 ),
@@ -153,7 +153,7 @@ class DoctorPortalScreen extends StatelessWidget {
         border: isOutlined ? Border.all(color: Colors.white, width: 2) : null,
         boxShadow: isOutlined ? [] : [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha: 0.2),
             blurRadius: 10,
             offset: const Offset(0, 5),
           )

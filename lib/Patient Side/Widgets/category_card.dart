@@ -31,7 +31,7 @@ class CategoryCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 5),
             ),
@@ -47,7 +47,7 @@ class CategoryCard extends StatelessWidget {
                 top: -20,
                 child: CircleAvatar(
                   radius: 50,
-                  backgroundColor: color.withOpacity(0.05),
+                  backgroundColor: color.withValues(alpha: 0.05),
                 ),
               ),
               Padding(
@@ -59,7 +59,7 @@ class CategoryCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
+                        color: color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Icon(icon, color: color, size: 28),

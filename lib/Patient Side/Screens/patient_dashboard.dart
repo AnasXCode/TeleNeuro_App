@@ -57,12 +57,15 @@ class _PatientDashboardState extends State<PatientDashboard> {
       try {
         DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (userDoc.exists && userDoc.data() != null) {
+          if (!mounted) return;
           setState(() {
             var data = userDoc.data() as Map<String, dynamic>?;
             _userName = (data?['name'] ?? "Patient").toString();
           });
         }
-      } catch (e) {}
+      } catch (e) {
+        debugPrint('Patient dashboard: fetch user name failed: $e');
+      }
     }
   }
 
@@ -77,19 +80,22 @@ class _PatientDashboardState extends State<PatientDashboard> {
   Future<void> _showLogoutDialog(BuildContext context) async {
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text("Logout"),
         content: const Text("End session?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
+              final nav = Navigator.of(context);
               await FirebaseAuth.instance.signOut();
-              if (mounted) {
-                Navigator.pop(context);
-                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const PatientPortalScreen()), (route) => false);
-              }
+              if (!context.mounted) return;
+              nav.pop();
+              nav.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (c) => const PatientPortalScreen()),
+                (route) => false,
+              );
             },
             child: const Text("Logout", style: TextStyle(color: Colors.white)),
           ),
@@ -136,14 +142,19 @@ class _PatientDashboardState extends State<PatientDashboard> {
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
     Widget bodyContent;
-    if (_selectedIndex == 0) bodyContent = _buildHomeContent();
-    else if (_selectedIndex == 1) bodyContent = const CalendarPage();
-    else if (_selectedIndex == 2) bodyContent = const PatientChatScreen();
-    else bodyContent = const TabNotificationsScreen();
+    if (_selectedIndex == 0) {
+      bodyContent = _buildHomeContent();
+    } else if (_selectedIndex == 1) {
+      bodyContent = const CalendarPage();
+    } else if (_selectedIndex == 2) {
+      bodyContent = const PatientChatScreen();
+    } else {
+      bodyContent = const TabNotificationsScreen();
+    }
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         _showLogoutDialog(context);
       },
@@ -235,32 +246,52 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 final docs = snapshot.data!.docs;
                 if (docs.isEmpty) return const Center(child: Text("No specialists registered yet."));
 
-                // ✅ 1. FILTERING LOGIC: Sirf 4.0 ya us se zyada rating wale doctors
-                var topRatedDocs = docs.where((doc) {
-                  var data = doc.data() as Map<String, dynamic>?;
-                  if (data == null) return false;
-                  double rating = (data['rating'] ?? 0.0).toDouble();
-                  return rating >= 4.0; // New doctors automatically nikal jayenge
-                }).toList();
+                final query = _searchQuery.trim().toLowerCase();
+                final List<DocumentSnapshot> displayList;
 
-                // ✅ 2. SORTING LOGIC: Highest Rating Doctors First
-                topRatedDocs.sort((a, b) {
-                  var dataA = a.data() as Map<String, dynamic>;
-                  var dataB = b.data() as Map<String, dynamic>;
-                  double ratingA = (dataA['rating'] ?? 0.0).toDouble();
-                  double ratingB = (dataB['rating'] ?? 0.0).toDouble();
-                  return ratingB.compareTo(ratingA); // Descending order
-                });
+                if (query.isNotEmpty) {
+                  displayList = docs.where((doc) {
+                    final data = doc.data() as Map<String, dynamic>?;
+                    if (data == null) return false;
+                    final name = (data['name'] ?? '').toString().toLowerCase();
+                    final speciality = (data['speciality'] ?? data['specialization'] ?? '').toString().toLowerCase();
+                    return name.contains(query) || speciality.contains(query);
+                  }).toList();
 
-                // ✅ 3. SEARCH & LIMIT: Search apply karein aur sirf top 5 dikhayein
-                final displayList = topRatedDocs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>?;
-                  if (data == null) return false;
-                  final name = (data['name'] ?? '').toString().toLowerCase();
-                  return name.contains(_searchQuery.toLowerCase());
-                }).take(5).toList(); // Sirf Top 5 doctors yahan se filter honge
+                  displayList.sort((a, b) {
+                    final dataA = a.data() as Map<String, dynamic>;
+                    final dataB = b.data() as Map<String, dynamic>;
+                    final ratingA = (dataA['rating'] ?? 0.0).toDouble();
+                    final ratingB = (dataB['rating'] ?? 0.0).toDouble();
+                    return ratingB.compareTo(ratingA);
+                  });
+                } else {
+                  var topRatedDocs = docs.where((doc) {
+                    var data = doc.data() as Map<String, dynamic>?;
+                    if (data == null) return false;
+                    double rating = (data['rating'] ?? 0.0).toDouble();
+                    return rating >= 4.0;
+                  }).toList();
 
-                if (displayList.isEmpty) return const Center(child: Text("More top rated doctors joining soon!", style: TextStyle(color: Colors.grey)));
+                  topRatedDocs.sort((a, b) {
+                    var dataA = a.data() as Map<String, dynamic>;
+                    var dataB = b.data() as Map<String, dynamic>;
+                    double ratingA = (dataA['rating'] ?? 0.0).toDouble();
+                    double ratingB = (dataB['rating'] ?? 0.0).toDouble();
+                    return ratingB.compareTo(ratingA);
+                  });
+
+                  displayList = topRatedDocs.take(5).toList();
+                }
+
+                if (displayList.isEmpty) {
+                  return Center(
+                    child: Text(
+                      query.isNotEmpty ? "No doctors found." : "More top rated doctors joining soon!",
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  );
+                }
 
                 return ListView.builder(
                   scrollDirection: Axis.horizontal,
@@ -293,7 +324,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         width: 150,
                         margin: const EdgeInsets.only(right: 15, bottom: 5, top: 5),
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5, offset: const Offset(0, 3))]),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 5, offset: const Offset(0, 3))]),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           mainAxisAlignment: MainAxisAlignment.center,

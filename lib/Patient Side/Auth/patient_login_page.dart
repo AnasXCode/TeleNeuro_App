@@ -125,10 +125,11 @@ class _LoginScreenState extends State<LoginScreen> {
   // --- FORGOT PASSWORD DIALOG ---
   void _showForgotPasswordDialog() {
     TextEditingController resetEmailController = TextEditingController();
+    final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Reset Password'),
           content: Column(
@@ -149,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text("Cancel"),
             ),
             ElevatedButton(
@@ -157,16 +158,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 String email = resetEmailController.text.trim();
                 if (email.isEmpty) return;
 
+                final nav = Navigator.of(dialogContext);
+
                 try {
                   await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-                  if (!mounted) return;
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  if (!dialogContext.mounted) return;
+                  nav.pop();
+                  messenger.showSnackBar(
                     const SnackBar(content: Text("Link sent! Please check your email."), backgroundColor: Colors.green),
                   );
                 } on FirebaseAuthException catch (e) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  if (!dialogContext.mounted) return;
+                  nav.pop();
+                  messenger.showSnackBar(
                     SnackBar(content: Text(e.message ?? "Error"), backgroundColor: Colors.red),
                   );
                 }

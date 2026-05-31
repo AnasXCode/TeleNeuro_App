@@ -2,9 +2,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:storage_client/storage_client.dart' show FileOptions;
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../supabase_config.dart';
 
 /// Uploads profile photos to Supabase and stores public URL on the user document.

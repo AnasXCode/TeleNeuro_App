@@ -132,7 +132,8 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                 try {
                   await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
 
-                  if (!mounted) return;
+                  if (!context.mounted) return;
+
                   Navigator.pop(context);
 
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -207,7 +208,7 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.25),
+                            color: Colors.blue.withValues(alpha: 0.25),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -325,7 +326,7 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                           borderRadius: BorderRadius.circular(15),
                           boxShadow: [
                             BoxShadow(
-                                color: const Color(0xFF0D47A1).withOpacity(0.3),
+                                color: const Color(0xFF0D47A1).withValues(alpha: 0.3),
                                 blurRadius: 10,
                                 offset: const Offset(0, 5)
                             )
@@ -402,7 +403,7 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.13),
+            color: Colors.blue.withValues(alpha: 0.13),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

@@ -8,6 +8,7 @@ class NotificationService {
   static const collection = 'notifications';
 
   static const typeAppointmentBooked = 'appointment_booked';
+  static const typeAppointmentAccepted = 'appointment_accepted';
   static const typeSessionCompleted = 'session_completed';
   static const typeChatMessage = 'chat_message';
   static const typeMriShared = 'mri_shared';
@@ -71,6 +72,26 @@ class NotificationService {
       title: 'New appointment request',
       body: '$patientName booked an appointment for $date at $time.',
       eventId: 'appt_booked_$appointmentId',
+      appointmentId: appointmentId,
+    );
+  }
+
+  static Future<void> notifyAppointmentAccepted({
+    required String patientId,
+    required String doctorId,
+    required String doctorName,
+    required String appointmentId,
+    required String date,
+    required String time,
+  }) async {
+    if (patientId.trim().isEmpty) return;
+    await send(
+      recipientId: patientId,
+      senderId: doctorId,
+      type: typeAppointmentAccepted,
+      title: 'Appointment accepted',
+      body: 'Dr. $doctorName accepted your appointment for $date at $time.',
+      eventId: 'appt_accepted_$appointmentId',
       appointmentId: appointmentId,
     );
   }

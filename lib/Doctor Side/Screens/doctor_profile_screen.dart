@@ -10,6 +10,7 @@ import '../../Profile Side/profile_selection.dart';
 import '../../Widgets/profile_avatar.dart';
 import '../../Widgets/account_delete_dialog.dart';
 import '../../services/profile_image_service.dart';
+import '../../services/user_profile_service.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -45,6 +46,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+
+      if (!mounted) return;
+
       if (doc.exists) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         setState(() {
@@ -71,6 +75,63 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     }
   }
 
+  Future<void> _saveProfileFields(Map<String, dynamic> fields, VoidCallback applyLocal) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await UserProfileService.syncDoctorProfileToFirestore(
+        uid: currentUserId,
+        fields: fields,
+      );
+      if (!mounted) return;
+      setState(applyLocal);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Profile updated successfully'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not save profile: $e'), backgroundColor: Colors.orange),
+      );
+    }
+  }
+
+  void _showEditFieldDialog({
+    required String title,
+    required String initialValue,
+    required Map<String, dynamic> Function(String value) buildFields,
+    required void Function(String newValue) applyLocal,
+    int maxLines = 1,
+  }) {
+    final controller = TextEditingController(text: initialValue == '—' || initialValue == 'Not Set' ? '' : initialValue);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Update $title'),
+        content: TextField(
+          controller: controller,
+          maxLines: maxLines,
+          decoration: InputDecoration(
+            labelText: title,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final value = controller.text.trim();
+              if (value.isEmpty) return;
+              Navigator.pop(dialogContext);
+              await _saveProfileFields(buildFields(value), () => applyLocal(value));
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // --- UPDATE EXPERIENCE DIALOG ---
   void _showEditExperienceDialog() {
     String currentExp = _experience.replaceAll(RegExp(r'[^0-9]'), '');
@@ -78,7 +139,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text("Update Experience"),
         content: TextField(
           controller: expController,
@@ -93,22 +154,32 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
           ElevatedButton(
             onPressed: () async {
               if (expController.text.isEmpty) return;
 
               String newExp = "${expController.text} Years";
 
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(currentUserId)
-                  .update({'experience': newExp});
+              // ✅ Linter fix: await se pehle navigator aur messenger capture kar liye
+              final nav = Navigator.of(dialogContext);
+              final messenger = ScaffoldMessenger.of(context);
 
-              setState(() => _experience = newExp);
-              if (!mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Experience Updated Successfully")));
+              try {
+                await UserProfileService.syncDoctorProfileToFirestore(
+                  uid: currentUserId,
+                  fields: {'experience': newExp},
+                );
+                if (!mounted) return;
+                setState(() => _experience = newExp);
+                nav.pop();
+                messenger.showSnackBar(const SnackBar(content: Text('Experience Updated Successfully')));
+              } catch (e) {
+                if (!mounted) return;
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Could not save experience: $e'), backgroundColor: Colors.orange),
+                );
+              }
             },
             child: const Text("Save"),
           ),
@@ -121,17 +192,24 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   void _handleLogout(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text("Logout"),
         content: const Text("Are you sure you want to logout?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
             onPressed: () async {
+              // ✅ Linter fix: await se pehle navigator capture kar liya
+              final nav = Navigator.of(context);
+
               await FirebaseAuth.instance.signOut();
-              if (!context.mounted) return;
-              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const DoctorLoginScreen()), (route) => false);
+
+              // ✅ Safely navigate directly without context
+              nav.pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const DoctorLoginScreen()),
+                      (route) => false
+              );
             },
             child: const Text("Logout", style: TextStyle(color: Colors.white)),
           ),
@@ -141,25 +219,31 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   }
 
   Future<void> _pickProfilePhoto() async {
+    final messenger = ScaffoldMessenger.of(context);
+
     final XFile? picked = await _picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
+
+    if (!mounted) return;
     setState(() => _pendingPhoto = File(picked.path));
 
     final url = await ProfileImageService.uploadAndSaveProfilePhoto(
       userId: currentUserId,
       imageFile: _pendingPhoto!,
     );
+
     if (!mounted) return;
+
     if (url != null) {
       setState(() {
         _photoUrl = url;
         _pendingPhoto = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Profile photo updated'), backgroundColor: Colors.green),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Could not upload photo'), backgroundColor: Colors.orange),
       );
     }
@@ -181,7 +265,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Left align ke liye
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
               child: Column(
@@ -208,10 +292,50 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             const SizedBox(height: 30),
 
             _buildProfileTile(Icons.email, "Email", _email),
-            _buildProfileTile(Icons.phone, "Phone", _phone),
-            _buildProfileTile(Icons.medical_services, "Specialization", _specialization),
-            _buildProfileTile(Icons.school, "Qualifications", _qualifications),
-            _buildProfileTile(Icons.local_hospital, "Hospital", _hospital),
+            _buildProfileTile(
+              Icons.phone,
+              "Phone",
+              _phone,
+              onEdit: () => _showEditFieldDialog(
+                title: 'Phone',
+                initialValue: _phone,
+                buildFields: (v) => {'phone': v},
+                applyLocal: (v) => _phone = v,
+              ),
+            ),
+            _buildProfileTile(
+              Icons.medical_services,
+              "Specialization",
+              _specialization,
+              onEdit: () => _showEditFieldDialog(
+                title: 'Specialization',
+                initialValue: _specialization,
+                buildFields: (v) => {'speciality': v, 'specialization': v},
+                applyLocal: (v) => _specialization = v,
+              ),
+            ),
+            _buildProfileTile(
+              Icons.school,
+              "Qualifications",
+              _qualifications,
+              onEdit: () => _showEditFieldDialog(
+                title: 'Qualifications',
+                initialValue: _qualifications,
+                buildFields: (v) => {'qualifications': v},
+                applyLocal: (v) => _qualifications = v,
+              ),
+            ),
+            _buildProfileTile(
+              Icons.local_hospital,
+              "Hospital",
+              _hospital,
+              onEdit: () => _showEditFieldDialog(
+                title: 'Hospital',
+                initialValue: _hospital,
+                buildFields: (v) => {'hospital': v},
+                applyLocal: (v) => _hospital = v,
+              ),
+            ),
             _buildProfileTile(Icons.star, "Rating", _rating),
 
             Card(
@@ -227,12 +351,19 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
               ),
             ),
 
-            if (_about != "—") ...[
-              const SizedBox(height: 8),
-              _buildProfileTile(Icons.info_outline, "About", _about),
-            ],
+            _buildProfileTile(
+              Icons.info_outline,
+              "About",
+              _about == '—' ? 'Not Set' : _about,
+              onEdit: () => _showEditFieldDialog(
+                title: 'About',
+                initialValue: _about,
+                buildFields: (v) => {'about': v},
+                applyLocal: (v) => _about = v,
+                maxLines: 4,
+              ),
+            ),
 
-            // PATIENT REVIEWS SECTION
             const Divider(thickness: 1.5),
             const SizedBox(height: 10),
             const Text(
@@ -241,7 +372,6 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             ),
             const SizedBox(height: 15),
 
-            // Real-time StreamBuilder for Reviews
             StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('appointments')
@@ -308,7 +438,6 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
 
             const SizedBox(height: 30),
 
-            // Buttons
             SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => _handleLogout(context), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0)), child: const Text("Logout", style: TextStyle(color: Colors.white)))),
             const SizedBox(height: 15),
             SizedBox(width: double.infinity, height: 50, child: OutlinedButton(onPressed: () => _handleDeleteAccount(context), style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)), child: const Text("Delete Account", style: TextStyle(color: Colors.red)))),
@@ -318,13 +447,19 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     );
   }
 
-  Widget _buildProfileTile(IconData icon, String title, String value) {
+  Widget _buildProfileTile(IconData icon, String title, String value, {VoidCallback? onEdit}) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         leading: Icon(icon, color: const Color(0xFF1565C0)),
         title: Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
         subtitle: Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+        trailing: onEdit != null
+            ? IconButton(
+                icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                onPressed: onEdit,
+              )
+            : null,
       ),
     );
   }

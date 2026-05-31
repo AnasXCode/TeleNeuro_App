@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-const Color _kPrimary = Color(0xFF1565C0);
-
 /// Public reviews list for a doctor profile (from rated appointments).
 class DoctorReviewsSection extends StatelessWidget {
   final String doctorId;
@@ -107,7 +105,8 @@ class DoctorReviewsSection extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: docs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              // ✅ Linter fix: (_, __) ki jagah (context, index)
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
                 final data = docs[i].data();
                 final stars = (data['givenRating'] ?? 0).toDouble();

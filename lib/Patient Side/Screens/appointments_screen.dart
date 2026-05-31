@@ -17,16 +17,21 @@ class _CalendarPageState extends State<CalendarPage> {
   void _clearHistory() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text("Clear History?"),
         content: const Text("Remove all Completed and Declined appointments from your list?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              Navigator.pop(context);
-              if (user == null) return;
+              // ✅ Linter Fix: Navigator capture
+              final nav = Navigator.of(dialogContext);
+
+              if (user == null) {
+                nav.pop();
+                return;
+              }
 
               QuerySnapshot snapshot = await FirebaseFirestore.instance
                   .collection('appointments')
@@ -38,7 +43,10 @@ class _CalendarPageState extends State<CalendarPage> {
               for (var doc in snapshot.docs) {
                 batch.update(doc.reference, {'patientDeleted': true});
               }
+
               await batch.commit();
+
+              nav.pop(); // Safe usage after await
             },
             child: const Text("Clear", style: TextStyle(color: Colors.white)),
           ),
@@ -84,14 +92,15 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   void _showRatingDialog(BuildContext context, String appointmentId, String doctorId, String doctorName) {
-    double _currentRating = 5.0;
-    TextEditingController _reviewController = TextEditingController();
+    // ✅ Linter Fix: Removed underscores for local variables
+    double currentRating = 5.0;
+    TextEditingController reviewController = TextEditingController();
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           title: Text("Rate Dr. $doctorName", style: const TextStyle(color: Color(0xFF1565C0))),
           content: SingleChildScrollView(
@@ -101,15 +110,15 @@ class _CalendarPageState extends State<CalendarPage> {
                 const Text("How was your experience?"),
                 const SizedBox(height: 10),
                 Slider(
-                  value: _currentRating,
+                  value: currentRating,
                   min: 1, max: 5, divisions: 4,
                   activeColor: Colors.amber,
-                  onChanged: (val) => setDialogState(() => _currentRating = val),
+                  onChanged: (val) => setDialogState(() => currentRating = val),
                 ),
-                Text("${_currentRating.toInt()} Stars", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
+                Text("${currentRating.toInt()} Stars", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
                 const SizedBox(height: 15),
                 TextField(
-                  controller: _reviewController,
+                  controller: reviewController,
                   maxLines: 2,
                   decoration: InputDecoration(
                     hintText: "Feedback (Optional)...",
@@ -120,14 +129,18 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0)),
               onPressed: () async {
-                await _submitRating(appointmentId, doctorId, _currentRating, _reviewController.text);
-                if (!mounted) return;
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Rating Submitted!")));
+                // ✅ Linter Fix: Captured variables before await
+                final nav = Navigator.of(dialogContext);
+                final messenger = ScaffoldMessenger.of(context);
+
+                await _submitRating(appointmentId, doctorId, currentRating, reviewController.text);
+
+                nav.pop();
+                messenger.showSnackBar(const SnackBar(content: Text("Rating Submitted!")));
               },
               child: const Text("Submit", style: TextStyle(color: Colors.white)),
             ),
@@ -254,7 +267,8 @@ class _CalendarPageState extends State<CalendarPage> {
                       trailing: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
+                          // ✅ Linter Fix: withOpacity replaced by withValues
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),

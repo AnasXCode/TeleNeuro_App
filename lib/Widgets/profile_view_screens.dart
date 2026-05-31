@@ -38,10 +38,12 @@ class _PatientProfileViewScreenState extends State<PatientProfileViewScreen> {
 
   Future<void> _load() async {
     final data = await UserProfileService.loadPatientProfile(widget.patientId);
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _data = data;
       _loading = false;
     });
+    }
   }
 
   @override
@@ -121,10 +123,12 @@ class _DoctorProfileViewScreenState extends State<DoctorProfileViewScreen> {
 
   Future<void> _load() async {
     final data = await UserProfileService.loadDoctorProfile(widget.doctorId);
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _data = data;
       _loading = false;
     });
+    }
   }
 
   @override

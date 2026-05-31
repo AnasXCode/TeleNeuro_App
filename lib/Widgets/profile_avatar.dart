@@ -24,9 +24,12 @@ class ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (userId != null && userId!.trim().isNotEmpty) {
+    // Local variable banaya taake Dart safely type promotion kar sake
+    final uid = userId;
+
+    if (uid != null && uid.trim().isNotEmpty) {
       return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('users').doc(userId).snapshots(),
+        stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
         builder: (context, snap) {
           final fromDb = snap.data?.data()?['photoUrl'] as String?;
           return _buildAvatar(
@@ -51,18 +54,22 @@ class ProfileAvatar extends StatelessWidget {
             width: radius * 2,
             height: radius * 2,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(fallbackIcon, size: radius, color: _kPrimary),
+            // Linter fix: Underscores ki jagah proper parameters pass kiye
+            errorBuilder: (context, error, stackTrace) => Icon(fallbackIcon, size: radius, color: _kPrimary),
           ),
         ),
       );
     }
-    if (localFile != null && localFile!.existsSync()) {
+
+    // Linter fix: localFile check hone ke baad '!' lagane ki zaroorat nahi
+    if (localFile != null && localFile.existsSync()) {
       return CircleAvatar(
         radius: radius,
         backgroundColor: const Color(0xFFE3F2FD),
-        backgroundImage: FileImage(localFile!),
+        backgroundImage: FileImage(localFile),
       );
     }
+
     return CircleAvatar(
       radius: radius,
       backgroundColor: const Color(0xFFE3F2FD),

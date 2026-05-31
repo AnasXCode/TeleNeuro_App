@@ -67,7 +67,7 @@ class PatientPortalScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: kPrimaryColor.withOpacity(0.3),
+                        color: kPrimaryColor.withValues(alpha: 0.3),
                         blurRadius: 15,
                         offset: const Offset(0, 8),
                       )
@@ -105,7 +105,7 @@ class PatientPortalScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: kPrimaryColor.withOpacity(0.8),
+                    color: kPrimaryColor.withValues(alpha: 0.8),
                     height: 1.5,
                   ),
                 ),
@@ -132,7 +132,7 @@ class PatientPortalScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: kPrimaryColor.withOpacity(0.4),
+                          color: kPrimaryColor.withValues(alpha: 0.4),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         )
@@ -174,7 +174,7 @@ class PatientPortalScreen extends StatelessWidget {
                       border: Border.all(color: kPrimaryColor, width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 5),
                         )

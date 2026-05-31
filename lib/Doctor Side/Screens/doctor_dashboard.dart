@@ -41,25 +41,25 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
   }
 
   Future<void> _showLogoutDialog() async {
+    final navigator = Navigator.of(context); // ✅ Async gap se pehle Navigator capture kar liya
+
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog( // ✅ Context shadowing theek karne ke liye name change kiya
         title: const Text("Logout"),
         content: const Text("Are you sure you want to logout?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text("Cancel"),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              if (!mounted) return;
-              Navigator.pop(context);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const DoctorLoginScreen()),
+              navigator.pop(); // ✅ Captured navigator use kiya
+              navigator.pushReplacement(
+                MaterialPageRoute(builder: (c) => const DoctorLoginScreen()),
               );
             },
             child: const Text("Logout", style: TextStyle(color: Colors.white)),
@@ -86,18 +86,18 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
         icon: uid.isEmpty
             ? const Icon(Icons.chat_bubble_outline_rounded)
             : BottomNavBadgeIcon(
-                icon: Icons.chat_bubble_outline_rounded,
-                countStream: NotificationService.unreadChatCountStream(uid),
-              ),
+          icon: Icons.chat_bubble_outline_rounded,
+          countStream: NotificationService.unreadChatCountStream(uid),
+        ),
         label: 'Chat',
       ),
       BottomNavigationBarItem(
         icon: uid.isEmpty
             ? const Icon(Icons.notifications_outlined)
             : BottomNavBadgeIcon(
-                icon: Icons.notifications_outlined,
-                countStream: NotificationService.unreadCountStream(uid),
-              ),
+          icon: Icons.notifications_outlined,
+          countStream: NotificationService.unreadCountStream(uid),
+        ),
         label: 'Alerts',
       ),
       const BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
@@ -117,7 +117,7 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
 
         // ✅ Agar user Home tab par nahi hai, toh back dabane par Home tab par le jao
@@ -177,6 +177,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
 
         if (doc.exists) {
           Map<String, dynamic>? data = doc.data() as Map<String, dynamic>?;
+          if (!mounted) return;
           setState(() {
             _doctorName = data?['name'] ?? 'Doctor';
             if (data != null && data.containsKey('rating')) _doctorRating = data['rating'].toString();
@@ -184,24 +185,39 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
           });
         }
       } catch (e) {
-        print("Error fetching doctor data: $e");
+        debugPrint("Error fetching doctor data: $e");
       }
     }
   }
 
   Future<void> _handleRequest(String docId, String status) async {
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
+      final apptSnap = await FirebaseFirestore.instance.collection('appointments').doc(docId).get();
+      final apptData = apptSnap.data();
+
       await FirebaseFirestore.instance.collection('appointments').doc(docId).update({
         'status': status,
       });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+
+      if (status == 'Accepted' && apptData != null) {
+        await NotificationService.notifyAppointmentAccepted(
+          patientId: (apptData['patientId'] ?? '').toString(),
+          doctorId: _currentDoctorId,
+          doctorName: _doctorName,
+          appointmentId: docId,
+          date: (apptData['date'] ?? '').toString(),
+          time: (apptData['time'] ?? '').toString(),
+        );
+      }
+
+      messenger.showSnackBar(SnackBar(
         content: Text(status == 'Accepted' ? "Request Accepted" : "Request Declined"),
         backgroundColor: status == 'Accepted' ? Colors.green : Colors.red,
       ));
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      messenger.showSnackBar(SnackBar(content: Text("Error: $e"))); // ✅ Captured messenger use kiya
     }
   }
 
@@ -236,7 +252,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                   .collection('appointments')
                   .where('doctorId', isEqualTo: _currentDoctorId)
                   .snapshots(),
-              builder: (context, snapshot) {
+              builder: (ctx, snapshot) {
                 int pendingCount = 0;
                 Set<String> uniquePatients = {};
 
@@ -290,7 +306,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                   .where('status', isEqualTo: 'Pending')
                   .where('doctorId', isEqualTo: _currentDoctorId)
                   .snapshots(),
-              builder: (context, snapshot) {
+              builder: (ctx, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: Padding(padding: EdgeInsets.all(20.0), child: CircularProgressIndicator()));
                 }
@@ -316,7 +332,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: docs.length,
-                  itemBuilder: (context, index) {
+                  itemBuilder: (ctx, index) {
                     var data = docs[index].data() as Map<String, dynamic>;
                     String docId = docs[index].id;
 
@@ -346,9 +362,9 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
             const SizedBox(height: 10),
 
             Container(
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))]),
               child: ListTile(
-                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), shape: BoxShape.circle), child: const Icon(Icons.people_outline, color: Color(0xFF1565C0))),
+                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.people_outline, color: Color(0xFF1565C0))),
                 title: const Text("View All Patients", style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text("Check patient history & reports"),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
@@ -359,9 +375,9 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
             ),
             const SizedBox(height: 8),
             Container(
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))]),
               child: ListTile(
-                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.08), shape: BoxShape.circle), child: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFC62828))),
+                leading: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.08), shape: BoxShape.circle), child: const Icon(Icons.picture_as_pdf_outlined, color: Color(0xFFC62828))),
                 title: const Text("Patient MRI reports", style: TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: const Text("Live summaries from Firebase (PDF stays on patient device)"),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
@@ -375,12 +391,12 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.teal.withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: Colors.teal.withValues(alpha: 0.1), shape: BoxShape.circle),
                   child: const Icon(Icons.menu_book_outlined, color: Colors.teal),
                 ),
                 title: const Text('User Guide', style: TextStyle(fontWeight: FontWeight.bold)),

@@ -58,9 +58,9 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       _interpreter = await Interpreter.fromAsset(
         'assets/vit_fyp_direct.tflite',
       );
-      print("✅ Model loaded successfully");
+      debugPrint("✅ Model loaded successfully");
     } catch (e) {
-      print("❌ Error loading model: $e");
+      debugPrint("❌ Error loading model: $e");
     }
   }
 
@@ -175,7 +175,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
       }
       probs = probs.map((e) => e / sumExp).toList();
 
-      print("🧠 AI MODEL CONFIDENCE: $probs");
+      debugPrint("🧠 AI MODEL CONFIDENCE: $probs");
 
       int predictedIndex = 0;
       double maxProb = probs[0];
@@ -235,7 +235,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
 
-      print("Inference Error: $e");
+      debugPrint("Inference Error: $e");
       setState(() {
         _isAnalyzing = false;
         _resultStage = "Error processing scan";
@@ -512,8 +512,8 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               content: Text(
                 uploaded
                     ? sharedNow
-                        ? 'Report saved to Lab Reports and shared with Dr. ${_selectedDoctorName ?? 'Doctor'}.'
-                        : 'Report saved to Lab Reports. Share it with a doctor anytime from there.'
+                    ? 'Report saved to Lab Reports and shared with Dr. ${_selectedDoctorName ?? 'Doctor'}.'
+                    : 'Report saved to Lab Reports. Share it with a doctor anytime from there.'
                     : 'Report saved to Lab Reports locally; cloud upload failed.\n$uploadStatus',
               ),
             ),
@@ -526,14 +526,14 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
             duration: Duration(seconds: 6),
             content: Text(
               'PDF saved on this device only.\n'
-              'Sign in to save the report to Lab Reports and share with your doctor.',
+                  'Sign in to save the report to Lab Reports and share with your doctor.',
             ),
           ),
         );
       }
 
       final output = await getTemporaryDirectory();
-      final file = File("${output.path}/TeleNeuro_Report_${patientID}.pdf");
+      final file = File("${output.path}/TeleNeuro_Report_$patientID.pdf");
       await file.writeAsBytes(pdfBytes);
 
       List<String> savedReports = prefs.getStringList('saved_reports') ?? [];
@@ -550,7 +550,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
         debugPrint('OpenFile failed (PDF still saved): $e');
       }
     } catch (e) {
-      print("PDF Error: $e");
+      debugPrint("PDF Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Error generating report: $e")),
@@ -618,7 +618,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: kSecondaryColor.withOpacity(0.5)),
+            border: Border.all(color: kSecondaryColor.withValues(alpha: 0.5)),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
@@ -631,10 +631,10 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               items: entries
                   .map(
                     (e) => DropdownMenuItem<String>(
-                      value: e.key,
-                      child: Text('Dr. ${e.value}', style: const TextStyle(fontSize: 14)),
-                    ),
-                  )
+                  value: e.key,
+                  child: Text('Dr. ${e.value}', style: const TextStyle(fontSize: 14)),
+                ),
+              )
                   .toList(),
               onChanged: (value) {
                 if (value == null) return;
@@ -677,7 +677,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
               decoration: BoxDecoration(
                 color: kAccentColor,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kSecondaryColor.withOpacity(0.5)),
+                border: Border.all(color: kSecondaryColor.withValues(alpha: 0.5)),
               ),
               child: const Row(
                 children: [
@@ -710,7 +710,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: Colors.grey.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     ),
@@ -802,12 +802,12 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                       borderRadius: BorderRadius.circular(15),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.green.withOpacity(0.1),
+                          color: Colors.green.withValues(alpha: 0.1),
                           blurRadius: 15,
                           offset: const Offset(0, 5),
                         ),
                       ],
-                      border: Border.all(color: Colors.green.withOpacity(0.3)),
+                      border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       children: [
@@ -919,7 +919,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                           await Share.shareXFiles(
                             [XFile(_pdfFilePath!)],
                             text:
-                                'Hello Dr. $doctorLabel, please find my TeleNeuro MRI Diagnostic Report attached for our consultation.',
+                            'Hello Dr. $doctorLabel, please find my TeleNeuro MRI Diagnostic Report attached for our consultation.',
                           );
                         },
                         icon: const Icon(Icons.share, color: Colors.white),

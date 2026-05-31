@@ -15,7 +15,7 @@ class AppointmentCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
+            color: Colors.grey.withValues(alpha: 0.08), // ✅ Fixed here
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -26,7 +26,7 @@ class AppointmentCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
+              color: Colors.blue.withValues(alpha: 0.1), // ✅ Fixed here
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.video_call, color: Colors.blue),

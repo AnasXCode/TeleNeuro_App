@@ -100,7 +100,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   labelText: 'Select doctor',
                   border: OutlineInputBorder(),
                 ),
-                value: selectedDoctorId,
+                initialValue: selectedDoctorId,
                 items: entries
                     .map(
                       (e) => DropdownMenuItem(
