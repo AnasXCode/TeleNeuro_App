@@ -14,11 +14,34 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
   bool _isObscure = true;
   bool _isLoading = false;
 
+  // Real-time email validation state
+  String _emailError = '';
+
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_validateEmailRealTime);
+  }
+
+  void _validateEmailRealTime() {
+    final email = _emailController.text.trim();
+    setState(() {
+      if (email.isEmpty) {
+        _emailError = '';
+      } else if (!RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$').hasMatch(email)) {
+        _emailError = 'Only @gmail.com emails are allowed';
+      } else {
+        _emailError = '';
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _emailController.removeListener(_validateEmailRealTime);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -257,10 +280,35 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                 // Email Field
                 FadeInAnimation(
                   delay: 4,
-                  child: _buildTextField(
-                    controller: _emailController,
-                    hintText: 'Email Address',
-                    icon: Icons.email_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTextField(
+                        controller: _emailController,
+                        hintText: 'Email Address',
+                        icon: Icons.email_outlined,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 12),
+                        child: _emailError.isNotEmpty
+                            ? Row(
+                                children: [
+                                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 15),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      _emailError,
+                                      style: const TextStyle(color: Colors.redAccent, fontSize: 12.5, fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                'Use your registered Gmail address (example@gmail.com)',
+                                style: TextStyle(color: Colors.blue[700], fontSize: 12, fontStyle: FontStyle.italic),
+                              ),
+                      ),
+                    ],
                   ),
                 ),
 
@@ -269,22 +317,34 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                 // Password Field
                 FadeInAnimation(
                   delay: 5,
-                  child: _buildTextField(
-                    controller: _passwordController,
-                    hintText: 'Password',
-                    icon: Icons.lock_outline,
-                    isPassword: true,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _isObscure ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.blue[800],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTextField(
+                        controller: _passwordController,
+                        hintText: 'Password',
+                        icon: Icons.lock_outline,
+                        isPassword: true,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isObscure ? Icons.visibility_off : Icons.visibility,
+                            color: Colors.blue[800],
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isObscure = !_isObscure;
+                            });
+                          },
+                        ),
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _isObscure = !_isObscure;
-                        });
-                      },
-                    ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6, left: 12),
+                        child: Text(
+                          'Required: 8+ chars, uppercase, lowercase, number & special character',
+                          style: TextStyle(color: Colors.blue[700], fontSize: 12, fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

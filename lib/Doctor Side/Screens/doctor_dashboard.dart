@@ -157,7 +157,7 @@ class DoctorHomeTab extends StatefulWidget {
 class _DoctorHomeTabState extends State<DoctorHomeTab> {
   String _doctorName = "Doctor";
   String _doctorRating = "4.9";
-  String _doctorExperience = "5+ Yrs";
+  String _doctorExperience = "0 Years";
   final String _currentDoctorId = FirebaseAuth.instance.currentUser!.uid;
 
   @override

@@ -366,8 +366,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
             mainAxisSpacing: 15,
             childAspectRatio: 1.1,
             children: [
-              CategoryCard(title: 'My Profile', subtitle: 'View Details', icon: Icons.account_circle_rounded, color: const Color(0xFF5C6BC0), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ProfileDisplayPage()))),
-              CategoryCard(title: 'Manage Account', subtitle: 'Edit Info', icon: Icons.settings_rounded, color: const Color(0xFF26C6DA), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const PatientProfilePage())).then((_) => _loadDashboardImage())),
               CategoryCard(title: 'Find Doctor', subtitle: 'Specialists', icon: Icons.person_search_rounded, color: const Color(0xFFEC407A), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AllDoctorsScreen()))),
               CategoryCard(title: 'Lab Reports', subtitle: 'Check History', icon: Icons.insert_drive_file_rounded, color: const Color(0xFF7E57C2), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ReportsPage()))),
               CategoryCard(title: 'AI Diagnosis', subtitle: 'Upload MRI', icon: Icons.document_scanner_rounded, color: const Color(0xFF00897B), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MRIUploadPage()))),

@@ -15,18 +15,54 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
   bool _isConfirmObscure = true;
   bool _isLoading = false;
 
+  // Real-time validation state
+  String _emailError = '';
+  String _password = '';
+
   // Controllers
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _specializationController = TextEditingController();
+  final TextEditingController _qualificationsController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_validateEmailRealTime);
+    _passwordController.addListener(_validatePasswordRealTime);
+  }
+
+  void _validateEmailRealTime() {
+    final email = _emailController.text.trim();
+    setState(() {
+      if (email.isEmpty) {
+        _emailError = '';
+      } else if (!RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$').hasMatch(email)) {
+        _emailError = 'Only @gmail.com emails are allowed';
+      } else {
+        _emailError = '';
+      }
+    });
+  }
+
+  void _validatePasswordRealTime() {
+    setState(() {
+      _password = _passwordController.text;
+    });
+  }
 
   @override
   void dispose() {
+    _emailController.removeListener(_validateEmailRealTime);
+    _passwordController.removeListener(_validatePasswordRealTime);
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _specializationController.dispose();
+    _qualificationsController.dispose();
     super.dispose();
   }
 
@@ -35,11 +71,25 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
+    String specialization = _specializationController.text.trim();
+    String qualifications = _qualificationsController.text.trim();
 
     // Validation
-    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty || specialization.isEmpty || qualifications.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Email validation: only @gmail.com allowed
+    final gmailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$');
+    if (!gmailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only Gmail addresses are allowed (e.g. user@gmail.com)'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -51,9 +101,15 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
       return;
     }
 
-    if (password.length < 6) {
+    // Password validation: min 8 chars, uppercase, lowercase, digit, special character
+    final passwordRegex = RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?~`]).{8,}$');
+    if (!passwordRegex.hasMatch(password)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 6 characters'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
       );
       return;
     }
@@ -76,7 +132,9 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
         'name': name,
         'email': email,
         'role': 'Doctor',
-        'speciality': 'General Physician',
+        'speciality': specialization,
+        'specialization': specialization,
+        'qualifications': qualifications,
 
         // ✅ NEW LOGIC: Default rating for new doctors
         'rating': 0.0,
@@ -228,22 +286,50 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
                   FadeInAnimation(
                     delay: 4,
-                    child: _buildTextField(
-                      controller: _emailController,
-                      hintText: 'Email Address',
-                      icon: Icons.email_outlined,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTextField(
+                          controller: _emailController,
+                          hintText: 'Email Address',
+                          icon: Icons.email_outlined,
+                        ),
+                        if (_emailError.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6, left: 12),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _emailError,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
 
                   FadeInAnimation(
                     delay: 5,
-                    child: _buildTextField(
-                      controller: _passwordController,
-                      hintText: 'Password',
-                      icon: Icons.lock_outline,
-                      isPassword: true,
-                      isConfirmField: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTextField(
+                          controller: _passwordController,
+                          hintText: 'Password',
+                          icon: Icons.lock_outline,
+                          isPassword: true,
+                          isConfirmField: false,
+                        ),
+                        if (_password.isNotEmpty)
+                          _buildPasswordChecklist(_password),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -258,12 +344,32 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
                       isConfirmField: true,
                     ),
                   ),
+                  const SizedBox(height: 20),
+
+                  FadeInAnimation(
+                    delay: 7,
+                    child: _buildTextField(
+                      controller: _specializationController,
+                      hintText: 'Specialization (e.g. Neurologist)',
+                      icon: Icons.medical_services_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  FadeInAnimation(
+                    delay: 8,
+                    child: _buildTextField(
+                      controller: _qualificationsController,
+                      hintText: 'Qualifications (e.g. MBBS, MD)',
+                      icon: Icons.school_outlined,
+                    ),
+                  ),
 
                   const SizedBox(height: 40),
 
                   // Signup Button
                   FadeInAnimation(
-                    delay: 7,
+                    delay: 9,
                     child: ScaleButton(
                       onTap: _isLoading ? () {} : _handleSignup,
                       child: Container(
@@ -300,7 +406,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
                   // Login Link
                   FadeInAnimation(
-                    delay: 8,
+                    delay: 10,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -390,6 +496,47 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
             horizontal: 20,
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordChecklist(String password) {
+    final checks = [
+      {'label': 'Minimum 8 characters', 'passed': password.length >= 8},
+      {'label': 'Uppercase letter (A-Z)', 'passed': RegExp(r'[A-Z]').hasMatch(password)},
+      {'label': 'Lowercase letter (a-z)', 'passed': RegExp(r'[a-z]').hasMatch(password)},
+      {'label': 'Number (0-9)', 'passed': RegExp(r'\d').hasMatch(password)},
+      {'label': 'Special character (!@#\$%^&*)', 'passed': RegExp(r'''[!@#\$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]''').hasMatch(password)},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, left: 8, right: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: checks.map((check) {
+          final passed = check['passed'] as bool;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(
+                  passed ? Icons.check_circle : Icons.cancel,
+                  color: passed ? Colors.greenAccent : Colors.redAccent,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  check['label'] as String,
+                  style: TextStyle(
+                    color: passed ? Colors.white : Colors.white70,
+                    fontSize: 12.5,
+                    fontWeight: passed ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }

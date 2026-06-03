@@ -18,6 +18,10 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isConfirmObscure = true;
   bool _isLoading = false;
 
+  // Real-time validation state
+  String _emailError = '';
+  String _password = '';
+
   // Professional Blue Theme Colors
   final Color kPrimaryColor = const Color(0xFF1565C0);
   final Color kSecondaryColor = const Color(0xFF42A5F5);
@@ -26,13 +30,45 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _dobController = TextEditingController();
+  String _gender = "Male";
+  String _bloodGroup = "B+";
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_validateEmailRealTime);
+    _passwordController.addListener(_validatePasswordRealTime);
+  }
+
+  void _validateEmailRealTime() {
+    final email = _emailController.text.trim();
+    setState(() {
+      if (email.isEmpty) {
+        _emailError = '';
+      } else if (!RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$').hasMatch(email)) {
+        _emailError = 'Only @gmail.com emails are allowed';
+      } else {
+        _emailError = '';
+      }
+    });
+  }
+
+  void _validatePasswordRealTime() {
+    setState(() {
+      _password = _passwordController.text;
+    });
+  }
 
   @override
   void dispose() {
+    _emailController.removeListener(_validateEmailRealTime);
+    _passwordController.removeListener(_validatePasswordRealTime);
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _dobController.dispose();
     super.dispose();
   }
 
@@ -42,11 +78,26 @@ class _SignupScreenState extends State<SignupScreen> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
+    String dob = _dobController.text.trim();
+    String gender = _gender;
+    String bloodGroup = _bloodGroup;
 
     // Validations
-    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
+    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty || dob.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Email validation: only @gmail.com allowed
+    final gmailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$');
+    if (!gmailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only Gmail addresses are allowed (e.g. user@gmail.com)'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -58,9 +109,15 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (password.length < 6) {
+    // Password validation: min 8 chars, uppercase, lowercase, digit, special character
+    final passwordRegex = RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};:"\\|,.<>\/?~`]).{8,}$');
+    if (!passwordRegex.hasMatch(password)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 6 characters'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
       );
       return;
     }
@@ -82,6 +139,9 @@ class _SignupScreenState extends State<SignupScreen> {
         'name': name,
         'email': email,
         'role': 'patient',
+        'dob': dob,
+        'gender': gender,
+        'bloodGroup': bloodGroup,
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -93,6 +153,9 @@ class _SignupScreenState extends State<SignupScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('name', name);
       await prefs.setString('email', email);
+      await prefs.setString('dob', dob);
+      await prefs.setString('gender', gender);
+      await prefs.setString('bloodGroup', bloodGroup);
 
       // Step 3: Sign out immediately so they have to log in manually
       await FirebaseAuth.instance.signOut();
@@ -228,10 +291,31 @@ class _SignupScreenState extends State<SignupScreen> {
                   // Email Field
                   FadeInAnimation(
                     delay: 4,
-                    child: _buildTextField(
-                      controller: _emailController,
-                      hintText: 'Email Address',
-                      icon: Icons.email_outlined,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTextField(
+                          controller: _emailController,
+                          hintText: 'Email Address',
+                          icon: Icons.email_outlined,
+                        ),
+                        if (_emailError.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6, left: 12),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _emailError,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -239,12 +323,19 @@ class _SignupScreenState extends State<SignupScreen> {
                   // Password Field
                   FadeInAnimation(
                     delay: 5,
-                    child: _buildTextField(
-                      controller: _passwordController,
-                      hintText: 'Password',
-                      icon: Icons.lock_outline,
-                      isPassword: true,
-                      isConfirmField: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTextField(
+                          controller: _passwordController,
+                          hintText: 'Password',
+                          icon: Icons.lock_outline,
+                          isPassword: true,
+                          isConfirmField: false,
+                        ),
+                        if (_password.isNotEmpty)
+                          _buildPasswordChecklist(_password),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -260,11 +351,49 @@ class _SignupScreenState extends State<SignupScreen> {
                       isConfirmField: true,
                     ),
                   ),
+                  const SizedBox(height: 20),
+
+                  FadeInAnimation(
+                    delay: 7,
+                    child: _buildTextField(
+                      controller: _dobController,
+                      hintText: 'Date of Birth (e.g. DD-MM-YYYY)',
+                      icon: Icons.calendar_today_outlined,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  FadeInAnimation(
+                    delay: 8,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildDropdownField(
+                            label: "Gender",
+                            icon: Icons.wc_outlined,
+                            value: _gender,
+                            items: const ["Male", "Female", "Other"],
+                            onChanged: (v) => setState(() => _gender = v!),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: _buildDropdownField(
+                            label: "Blood Group",
+                            icon: Icons.water_drop_outlined,
+                            value: _bloodGroup,
+                            items: const ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+                            onChanged: (v) => setState(() => _bloodGroup = v!),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 40),
 
                   // SIGN UP BUTTON
                   FadeInAnimation(
-                    delay: 7,
+                    delay: 9,
                     child: ScaleButton(
                       onTap: _isLoading ? () {} : _handleSignup,
                       child: Container(
@@ -296,7 +425,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   // Login Link
                   FadeInAnimation(
-                    delay: 8,
+                    delay: 10,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -374,6 +503,82 @@ class _SignupScreenState extends State<SignupScreen> {
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required IconData icon,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(color: Colors.blue.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 5)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: kPrimaryColor, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: value,
+                isExpanded: true,
+                items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPasswordChecklist(String password) {
+    final checks = [
+      {'label': 'Minimum 8 characters', 'passed': password.length >= 8},
+      {'label': 'Uppercase letter (A-Z)', 'passed': RegExp(r'[A-Z]').hasMatch(password)},
+      {'label': 'Lowercase letter (a-z)', 'passed': RegExp(r'[a-z]').hasMatch(password)},
+      {'label': 'Number (0-9)', 'passed': RegExp(r'\d').hasMatch(password)},
+      {'label': 'Special character (!@#\$%^&*)', 'passed': RegExp(r'''[!@#\$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]''').hasMatch(password)},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, left: 8, right: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: checks.map((check) {
+          final passed = check['passed'] as bool;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(
+                  passed ? Icons.check_circle : Icons.cancel,
+                  color: passed ? const Color(0xFF4CAF50) : Colors.redAccent,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  check['label'] as String,
+                  style: TextStyle(
+                    color: passed ? const Color(0xFF2E7D32) : Colors.red[700],
+                    fontSize: 12.5,
+                    fontWeight: passed ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
