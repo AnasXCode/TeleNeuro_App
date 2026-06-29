@@ -33,6 +33,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   String _specialization = "—";
   String _qualifications = "—";
   String _about = "—";
+  String _dob = "—";
   String? _photoUrl;
   
   bool _loading = true;
@@ -63,6 +64,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           _specialization = data['speciality'] ?? data['specialization'] ?? "General Physician";
           _qualifications = data['qualifications'] ?? data['education'] ?? "—";
           _about = data['about'] ?? "—";
+          _dob = data['dob']?.toString().trim().isNotEmpty == true ? data['dob'].toString() : "—";
           _photoUrl = (data['photoUrl'] as String?)?.trim();
           if (_photoUrl != null && _photoUrl!.isEmpty) _photoUrl = null;
 
@@ -215,6 +217,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   const SizedBox(height: 12),
                   _infoCard([
                     _infoRow(Icons.email_outlined, "Email", _email),
+                    _divider(),
+                    _infoRow(Icons.calendar_today_outlined, "Date of Birth", _dob),
                     _divider(),
                     _infoRow(Icons.medical_services_outlined, "Specialization", _specialization),
                     _divider(),

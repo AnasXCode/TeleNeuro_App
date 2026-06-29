@@ -183,6 +183,7 @@ class _DoctorProfileViewScreenState extends State<DoctorProfileViewScreen> {
                   const SizedBox(height: 24),
                   _tile(Icons.email_outlined, 'Email', _data?['email']),
                   _tile(Icons.phone, 'Phone', _data?['phone']),
+                  _tile(Icons.calendar_today_outlined, 'Date of Birth', _data?['dob']),
                   _tile(Icons.local_hospital_outlined, 'Hospital', _data?['hospital']),
                   _tile(Icons.school_outlined, 'Qualifications', _data?['qualifications']),
                   _tile(Icons.work_outline, 'Experience', _data?['experience']),

@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../Auth/doctor_login_page.dart';
 import '../Widgets/stat_card.dart';
 import '../Widgets/request_card.dart';
-
-// --- SCREENS IMPORTS ---
 import 'doctor_appointments_screen.dart';
 import 'doctor_mri_reports_screen.dart';
 import 'doctor_guide_screen.dart';
@@ -38,35 +35,6 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
     setState(() {
       _selectedIndex = 1; // Schedule Tab index
     });
-  }
-
-  Future<void> _showLogoutDialog() async {
-    final navigator = Navigator.of(context); // ✅ Async gap se pehle Navigator capture kar liya
-
-    return showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog( // ✅ Context shadowing theek karne ke liye name change kiya
-        title: const Text("Logout"),
-        content: const Text("Are you sure you want to logout?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              navigator.pop(); // ✅ Captured navigator use kiya
-              navigator.pushReplacement(
-                MaterialPageRoute(builder: (c) => const DoctorLoginScreen()),
-              );
-            },
-            child: const Text("Logout", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _onTabSelected(int index) {
@@ -119,13 +87,8 @@ class _DoctorDashboardState extends State<DoctorDashboard> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-
-        // ✅ Agar user Home tab par nahi hai, toh back dabane par Home tab par le jao
         if (_selectedIndex != 0) {
           _goToHome();
-        } else {
-          // Agar user pehle hi Home tab par hai, tab Logout dialog show karo
-          _showLogoutDialog();
         }
       },
       child: Scaffold(
@@ -226,6 +189,7 @@ class _DoctorHomeTabState extends State<DoctorHomeTab> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9FC),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/auth_role_service.dart';
 
 // --- AUTH IMPORTS ---
 import '../Auth/patient_portal.dart';
@@ -243,7 +244,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 if (snapshot.hasError) return const Center(child: Text("Unable to load"));
                 if (!snapshot.hasData || snapshot.data == null) return const Center(child: Text("No data found"));
 
-                final docs = snapshot.data!.docs;
+                final docs = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>?;
+                  if (data == null) return false;
+                  return AuthRoleService.isRegisteredDoctor(data);
+                }).toList();
                 if (docs.isEmpty) return const Center(child: Text("No specialists registered yet."));
 
                 final query = _searchQuery.trim().toLowerCase();

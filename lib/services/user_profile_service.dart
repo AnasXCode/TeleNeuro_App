@@ -75,6 +75,7 @@ class UserProfileService {
       'name': _str(data['name'], 'Doctor'),
       'email': _str(data['email'], '—'),
       'phone': _str(data['phone'], '—'),
+      'dob': _str(data['dob'], '—'),
       'specialization': _str(data['speciality'] ?? data['specialization'], 'General Physician'),
       'qualifications': _str(data['qualifications'] ?? data['education'], '—'),
       'experience': _str(data['experience'], '—'),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'doctor_signup_page.dart';
 import '../Screens/doctor_dashboard.dart';
+import '../../services/email_validation.dart';
+import '../../services/auth_role_service.dart';
 
 class DoctorLoginScreen extends StatefulWidget {
   const DoctorLoginScreen({super.key});
@@ -29,13 +31,7 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
   void _validateEmailRealTime() {
     final email = _emailController.text.trim();
     setState(() {
-      if (email.isEmpty) {
-        _emailError = '';
-      } else if (!RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$').hasMatch(email)) {
-        _emailError = 'Only @gmail.com emails are allowed';
-      } else {
-        _emailError = '';
-      }
+      _emailError = EmailValidation.validateGmail(email) ?? '';
     });
   }
 
@@ -62,15 +58,39 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
       return;
     }
 
+    final emailValidationError = EmailValidation.validateGmail(email);
+    if (emailValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailValidationError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      final uid = cred.user?.uid;
+      if (uid != null) {
+        final role = await AuthRoleService.fetchUserRole(uid);
+        if (!AuthRoleService.isDoctorRole(role)) {
+          await AuthRoleService.signOut();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This account is not registered as a doctor. Please use Patient Login.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
 
       if (!mounted) return;
       Navigator.pushReplacement(

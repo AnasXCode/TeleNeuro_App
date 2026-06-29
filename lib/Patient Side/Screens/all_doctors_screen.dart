@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../Widgets/profile_view_screens.dart';
 import '../../Widgets/profile_avatar.dart';
+import '../../services/auth_role_service.dart';
 
 // Colors
 const Color kPrimaryColor = Color(0xFF1565C0);
@@ -39,7 +40,11 @@ class AllDoctorsScreen extends StatelessWidget {
             return const Center(child: Text("No doctors available right now."));
           }
 
-          var docs = snapshot.data!.docs;
+          var docs = snapshot.data!.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>?;
+            if (data == null) return false;
+            return AuthRoleService.isRegisteredDoctor(data);
+          }).toList();
 
           // ✅ SORTING LOGIC: Rating ke hisab se (Highest First)
           List<DocumentSnapshot> sortedDocs = List.from(docs);

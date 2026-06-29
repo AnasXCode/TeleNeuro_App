@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'doctor_login_page.dart';
+import '../../services/email_validation.dart';
+import '../../services/username_validation.dart';
+import '../../services/birth_date_utils.dart';
+import '../../data/medical_signup_options.dart';
+import '../../Widgets/birth_date_picker_field.dart';
+import '../../Widgets/searchable_dropdown_field.dart';
 
 class DoctorSignupScreen extends StatefulWidget {
   const DoctorSignupScreen({super.key});
@@ -17,6 +23,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
   // Real-time validation state
   String _emailError = '';
+  String _usernameError = '';
   String _password = '';
 
   // Controllers
@@ -24,26 +31,29 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
-  final TextEditingController _specializationController = TextEditingController();
-  final TextEditingController _qualificationsController = TextEditingController();
+  DateTime? _selectedDob;
+  String? _specialization;
+  String? _qualifications;
 
   @override
   void initState() {
     super.initState();
+    _nameController.addListener(_validateUsernameRealTime);
     _emailController.addListener(_validateEmailRealTime);
     _passwordController.addListener(_validatePasswordRealTime);
+  }
+
+  void _validateUsernameRealTime() {
+    final username = _nameController.text.trim();
+    setState(() {
+      _usernameError = UsernameValidation.validate(username) ?? '';
+    });
   }
 
   void _validateEmailRealTime() {
     final email = _emailController.text.trim();
     setState(() {
-      if (email.isEmpty) {
-        _emailError = '';
-      } else if (!RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$').hasMatch(email)) {
-        _emailError = 'Only @gmail.com emails are allowed';
-      } else {
-        _emailError = '';
-      }
+      _emailError = EmailValidation.validateGmailForSignup(email) ?? '';
     });
   }
 
@@ -55,14 +65,13 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
   @override
   void dispose() {
+    _nameController.removeListener(_validateUsernameRealTime);
     _emailController.removeListener(_validateEmailRealTime);
     _passwordController.removeListener(_validatePasswordRealTime);
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _specializationController.dispose();
-    _qualificationsController.dispose();
     super.dispose();
   }
 
@@ -71,23 +80,51 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
-    String specialization = _specializationController.text.trim();
-    String qualifications = _qualificationsController.text.trim();
+    final dobDate = _selectedDob;
+    final specialization = _specialization;
+    final qualifications = _qualifications;
 
     // Validation
-    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty || specialization.isEmpty || qualifications.isEmpty) {
+    if (name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty ||
+        dobDate == null ||
+        specialization == null ||
+        qualifications == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields'), backgroundColor: Colors.red),
       );
       return;
     }
 
-    // Email validation: only @gmail.com allowed
-    final gmailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$');
-    if (!gmailRegex.hasMatch(email)) {
+    if (!BirthDateUtils.isValidBirthDate(dobDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only Gmail addresses are allowed (e.g. user@gmail.com)'),
+        const SnackBar(content: Text('Please select a valid date of birth'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final dob = BirthDateUtils.formatDisplay(dobDate);
+
+    // Username validation
+    final usernameValidationError = UsernameValidation.validate(name);
+    if (usernameValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(usernameValidationError),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Email validation
+    final emailValidationError = EmailValidation.validateGmailForSignup(email);
+    if (emailValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(emailValidationError),
           backgroundColor: Colors.red,
         ),
       );
@@ -120,6 +157,15 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
     });
 
     try {
+      final usernameCheck = UsernameValidation.validate(name);
+      if (usernameCheck != null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(usernameCheck), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
       // 1. Create User in Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
@@ -132,6 +178,8 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
         'name': name,
         'email': email,
         'role': 'Doctor',
+        'registeredVia': 'doctor_signup',
+        'dob': dob,
         'speciality': specialization,
         'specialization': specialization,
         'qualifications': qualifications,
@@ -276,10 +324,31 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
                   // Fields
                   FadeInAnimation(
                     delay: 3,
-                    child: _buildTextField(
-                      controller: _nameController,
-                      hintText: 'Full Name',
-                      icon: Icons.person_outline,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTextField(
+                          controller: _nameController,
+                          hintText: 'Full Name',
+                          icon: Icons.person_outline,
+                        ),
+                        if (_usernameError.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6, left: 12),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _usernameError,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -348,20 +417,36 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
                   FadeInAnimation(
                     delay: 7,
-                    child: _buildTextField(
-                      controller: _specializationController,
-                      hintText: 'Specialization (e.g. Neurologist)',
-                      icon: Icons.medical_services_outlined,
+                    child: BirthDatePickerField(
+                      selectedDate: _selectedDob,
+                      accentColor: Colors.blue.shade900,
+                      onDateSelected: (date) => setState(() => _selectedDob = date),
                     ),
                   ),
                   const SizedBox(height: 20),
 
                   FadeInAnimation(
                     delay: 8,
-                    child: _buildTextField(
-                      controller: _qualificationsController,
-                      hintText: 'Qualifications (e.g. MBBS, MD)',
+                    child: SearchableDropdownField(
+                      value: _specialization,
+                      options: MedicalSignupOptions.specializations,
+                      hintText: 'Select Specialization',
+                      icon: Icons.medical_services_outlined,
+                      accentColor: Colors.blue.shade900,
+                      onSelected: (v) => setState(() => _specialization = v),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  FadeInAnimation(
+                    delay: 9,
+                    child: SearchableDropdownField(
+                      value: _qualifications,
+                      options: MedicalSignupOptions.qualifications,
+                      hintText: 'Select Qualification',
                       icon: Icons.school_outlined,
+                      accentColor: Colors.blue.shade900,
+                      onSelected: (v) => setState(() => _qualifications = v),
                     ),
                   ),
 
@@ -369,7 +454,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
                   // Signup Button
                   FadeInAnimation(
-                    delay: 9,
+                    delay: 10,
                     child: ScaleButton(
                       onTap: _isLoading ? () {} : _handleSignup,
                       child: Container(
@@ -406,7 +491,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
                   // Login Link
                   FadeInAnimation(
-                    delay: 10,
+                    delay: 11,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

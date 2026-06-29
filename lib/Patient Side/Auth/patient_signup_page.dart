@@ -4,6 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 import 'package:shared_preferences/shared_preferences.dart';
 import 'patient_portal.dart';
 import 'patient_login_page.dart'; // Login Page Import
+import '../../services/email_validation.dart';
+import '../../services/username_validation.dart';
+import '../../services/birth_date_utils.dart';
+import '../../Widgets/birth_date_picker_field.dart';
 
 
 class SignupScreen extends StatefulWidget {
@@ -20,6 +24,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // Real-time validation state
   String _emailError = '';
+  String _usernameError = '';
   String _password = '';
 
   // Professional Blue Theme Colors
@@ -30,27 +35,29 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
-  final TextEditingController _dobController = TextEditingController();
+  DateTime? _selectedDob;
   String _gender = "Male";
   String _bloodGroup = "B+";
 
   @override
   void initState() {
     super.initState();
+    _nameController.addListener(_validateUsernameRealTime);
     _emailController.addListener(_validateEmailRealTime);
     _passwordController.addListener(_validatePasswordRealTime);
+  }
+
+  void _validateUsernameRealTime() {
+    final username = _nameController.text.trim();
+    setState(() {
+      _usernameError = UsernameValidation.validate(username) ?? '';
+    });
   }
 
   void _validateEmailRealTime() {
     final email = _emailController.text.trim();
     setState(() {
-      if (email.isEmpty) {
-        _emailError = '';
-      } else if (!RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$').hasMatch(email)) {
-        _emailError = 'Only @gmail.com emails are allowed';
-      } else {
-        _emailError = '';
-      }
+      _emailError = EmailValidation.validateGmailForSignup(email) ?? '';
     });
   }
 
@@ -62,13 +69,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
+    _nameController.removeListener(_validateUsernameRealTime);
     _emailController.removeListener(_validateEmailRealTime);
     _passwordController.removeListener(_validatePasswordRealTime);
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _dobController.dispose();
     super.dispose();
   }
 
@@ -78,24 +85,45 @@ class _SignupScreenState extends State<SignupScreen> {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
     String confirmPassword = _confirmPasswordController.text.trim();
-    String dob = _dobController.text.trim();
+    final dobDate = _selectedDob;
     String gender = _gender;
     String bloodGroup = _bloodGroup;
 
     // Validations
-    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty || dob.isEmpty) {
+    if (name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty || dobDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields'), backgroundColor: Colors.red),
       );
       return;
     }
 
-    // Email validation: only @gmail.com allowed
-    final gmailRegex = RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$');
-    if (!gmailRegex.hasMatch(email)) {
+    if (!BirthDateUtils.isValidBirthDate(dobDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only Gmail addresses are allowed (e.g. user@gmail.com)'),
+        const SnackBar(content: Text('Please select a valid date of birth'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final dob = BirthDateUtils.formatDisplay(dobDate);
+
+    // Username validation
+    final usernameValidationError = UsernameValidation.validate(name);
+    if (usernameValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(usernameValidationError),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Email validation
+    final emailValidationError = EmailValidation.validateGmailForSignup(email);
+    if (emailValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(emailValidationError),
           backgroundColor: Colors.red,
         ),
       );
@@ -127,6 +155,15 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
+      final usernameCheck = UsernameValidation.validate(name);
+      if (usernameCheck != null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(usernameCheck), backgroundColor: Colors.red),
+        );
+        return;
+      }
+
       // Step 1: Create User in Firebase Auth
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: email,
@@ -139,6 +176,7 @@ class _SignupScreenState extends State<SignupScreen> {
         'name': name,
         'email': email,
         'role': 'patient',
+        'registeredVia': 'patient_signup',
         'dob': dob,
         'gender': gender,
         'bloodGroup': bloodGroup,
@@ -280,10 +318,31 @@ class _SignupScreenState extends State<SignupScreen> {
                   // Name Field
                   FadeInAnimation(
                     delay: 3,
-                    child: _buildTextField(
-                      controller: _nameController,
-                      hintText: 'Full Name',
-                      icon: Icons.person_outline,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTextField(
+                          controller: _nameController,
+                          hintText: 'Full Name',
+                          icon: Icons.person_outline,
+                        ),
+                        if (_usernameError.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6, left: 12),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    _usernameError,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -355,10 +414,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
                   FadeInAnimation(
                     delay: 7,
-                    child: _buildTextField(
-                      controller: _dobController,
-                      hintText: 'Date of Birth (e.g. DD-MM-YYYY)',
-                      icon: Icons.calendar_today_outlined,
+                    child: BirthDatePickerField(
+                      selectedDate: _selectedDob,
+                      accentColor: kPrimaryColor,
+                      onDateSelected: (date) => setState(() => _selectedDob = date),
                     ),
                   ),
                   const SizedBox(height: 20),

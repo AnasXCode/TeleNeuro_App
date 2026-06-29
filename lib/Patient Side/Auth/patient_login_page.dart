@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../Screens/patient_dashboard.dart';
 
 import 'patient_signup_page.dart';
+import '../../services/email_validation.dart';
+import '../../services/auth_role_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,13 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _validateEmailRealTime() {
     final email = _emailController.text.trim();
     setState(() {
-      if (email.isEmpty) {
-        _emailError = '';
-      } else if (!RegExp(r'^[a-zA-Z0-9._%+-]+@gmail\.com$').hasMatch(email)) {
-        _emailError = 'Only @gmail.com emails are allowed';
-      } else {
-        _emailError = '';
-      }
+      _emailError = EmailValidation.validateGmail(email) ?? '';
     });
   }
 
@@ -69,6 +65,14 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    final emailValidationError = EmailValidation.validateGmail(email);
+    if (emailValidationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailValidationError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -78,6 +82,22 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         password: password,
       );
+
+      final uid = cred.user?.uid;
+      if (uid != null) {
+        final role = await AuthRoleService.fetchUserRole(uid);
+        if (!AuthRoleService.isPatientRole(role)) {
+          await AuthRoleService.signOut();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This account is not registered as a patient. Please use Doctor Login.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      }
 
       // Cache patient name + email locally so PDFs and offline screens have them.
       try {
