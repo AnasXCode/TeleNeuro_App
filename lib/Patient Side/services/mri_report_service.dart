@@ -30,13 +30,12 @@ class MriReportService {
     }
 
     final reportDoctorId = (data['doctorId'] as String?)?.trim();
-    if (reportDoctorId != null && reportDoctorId.isNotEmpty) {
-      return reportDoctorId == doctorId;
+    if (reportDoctorId == null || reportDoctorId.isEmpty || reportDoctorId != doctorId) {
+      return false;
     }
 
-    // Legacy reports (before doctor-scoped sharing): visible to all linked doctors.
     final patientUid = data['patientUid'] as String?;
-    return linkedPatientIds.contains(patientUid);
+    return patientUid != null && patientUid.isNotEmpty && linkedPatientIds.contains(patientUid);
   }
 
   static Stream<QuerySnapshot<Map<String, dynamic>>> patientLibraryReportsStream(String patientUid) {
@@ -50,7 +49,7 @@ class MriReportService {
     return FirebaseFirestore.instance
         .collection('appointments')
         .where('patientId', isEqualTo: patientUid)
-        .where('status', whereIn: ['Accepted', 'Completed', 'Pending'])
+        .where('status', isEqualTo: 'Accepted')
         .snapshots();
   }
 
@@ -61,6 +60,7 @@ class MriReportService {
     for (final doc in appointmentDocs) {
       final data = doc.data();
       if (data['patientDeleted'] == true) continue;
+      if ((data['status'] ?? '').toString() != 'Accepted') continue;
       final doctorId = (data['doctorId'] as String?)?.trim();
       final doctorName = (data['doctorName'] as String?)?.trim();
       if (doctorId != null && doctorId.isNotEmpty) {
@@ -206,7 +206,7 @@ class MriReportService {
     final appointmentDoctors = await _fetchAppointmentDoctors(patientUid);
     if (!appointmentDoctors.containsKey(doctorId)) {
       return ShareReportResult.failure(
-        'You can only share with doctors who have an appointment with you.',
+        'You can only share with doctors who have accepted your appointment.',
       );
     }
 
@@ -262,7 +262,7 @@ class MriReportService {
     final snapshot = await FirebaseFirestore.instance
         .collection('appointments')
         .where('patientId', isEqualTo: patientUid)
-        .where('status', whereIn: ['Accepted', 'Completed', 'Pending'])
+        .where('status', isEqualTo: 'Accepted')
         .get();
     return doctorsFromAppointments(snapshot.docs);
   }

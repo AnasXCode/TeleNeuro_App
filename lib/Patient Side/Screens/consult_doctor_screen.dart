@@ -74,7 +74,8 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         _problemController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Please fill all details (Date, Time, Problem)')),
+          content: Text('Please fill all details (Date, Time, Problem)'),
+        ),
       );
       return;
     }
@@ -83,7 +84,8 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
     final messenger = ScaffoldMessenger.of(context);
     final nav = Navigator.of(context);
     final String formattedTime = _selectedTime!.format(context);
-    final String formattedDate = "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}";
+    final String formattedDate =
+        "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}";
 
     setState(() => _isLoading = true);
 
@@ -117,7 +119,7 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
         else if (status == 'Accepted') {
           hasActiveSession = true;
           statusMessage =
-          "You already have an active session. Please check 'Messages'.";
+              "You already have an active session. Please check 'Messages'.";
           break;
         }
       }
@@ -151,17 +153,19 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
       }
 
       // Firestore mein Save karna
-      final appointmentRef = await FirebaseFirestore.instance.collection('appointments').add({
-        'patientId': user.uid,
-        'patientName': patientName,
-        'doctorId': widget.doctorId,
-        'doctorName': widget.doctorName,
-        'problem': _problemController.text.trim(),
-        'date': formattedDate,
-        'time': formattedTime,
-        'status': 'Pending', // Shuru mein Pending rahega
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      final appointmentRef = await FirebaseFirestore.instance
+          .collection('appointments')
+          .add({
+            'patientId': user.uid,
+            'patientName': patientName,
+            'doctorId': widget.doctorId,
+            'doctorName': widget.doctorName,
+            'problem': _problemController.text.trim(),
+            'date': formattedDate,
+            'time': formattedTime,
+            'status': 'Pending', // Shuru mein Pending rahega
+            'timestamp': FieldValue.serverTimestamp(),
+          });
 
       await NotificationService.notifyAppointmentBooked(
         doctorId: widget.doctorId,
@@ -175,12 +179,12 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
       // Success Message
       messenger.showSnackBar(
         const SnackBar(
-            content: Text('Appointment Request Sent!'),
-            backgroundColor: Colors.green),
+          content: Text('Appointment Request Sent!'),
+          backgroundColor: Colors.green,
+        ),
       );
 
       nav.pop(); // Wapis Dashboard par chale jayen
-
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
@@ -195,7 +199,8 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-            "Book Dr. ${widget.doctorName}"), // ✅ Doctor ka naam Header mein
+          "Book Dr. ${widget.doctorName}",
+        ), // ✅ Doctor ka naam Header mein
         backgroundColor: kPrimaryColor,
         elevation: 0,
       ),
@@ -228,36 +233,44 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
             Text(
               "Consultation Details",
               style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: kPrimaryColor),
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: kPrimaryColor,
+              ),
             ),
             const SizedBox(height: 20),
 
             // Problem Input
-            const Text("Describe your problem",
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              "Describe your problem",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 10),
             TextField(
               controller: _problemController,
               maxLines: 4,
               decoration: InputDecoration(
                 hintText: "E.g. I have a severe headache...",
-                border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             const SizedBox(height: 20),
 
             // Date Picker
-            const Text("Select Date",
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              "Select Date",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 10),
             InkWell(
               onTap: _pickDate,
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 15,
+                  horizontal: 15,
+                ),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(12),
@@ -270,9 +283,10 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                           ? "Choose Date"
                           : "${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}",
                       style: TextStyle(
-                          color: _selectedDate == null
-                              ? Colors.grey
-                              : Colors.black),
+                        color: _selectedDate == null
+                            ? Colors.grey
+                            : Colors.black,
+                      ),
                     ),
                     const Icon(Icons.calendar_today, color: Colors.grey),
                   ],
@@ -282,14 +296,18 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
             const SizedBox(height: 20),
 
             // Time Picker
-            const Text("Select Time",
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              "Select Time",
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 10),
             InkWell(
               onTap: _pickTime,
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 15,
+                  horizontal: 15,
+                ),
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey),
                   borderRadius: BorderRadius.circular(12),
@@ -302,9 +320,10 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                           ? "Choose Time"
                           : _selectedTime!.format(context),
                       style: TextStyle(
-                          color: _selectedTime == null
-                              ? Colors.grey
-                              : Colors.black),
+                        color: _selectedTime == null
+                            ? Colors.grey
+                            : Colors.black,
+                      ),
                     ),
                     const Icon(Icons.access_time, color: Colors.grey),
                   ],
@@ -323,15 +342,19 @@ class _ConsultDoctorPageState extends State<ConsultDoctorPage> {
                   backgroundColor: kPrimaryColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Book Appointment",
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white)),
+                    : const Text(
+                        "Book Appointment",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
           ],

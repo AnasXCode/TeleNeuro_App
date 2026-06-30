@@ -62,7 +62,7 @@ class _ReportsPageState extends State<ReportsPage> {
     final appointmentSnap = await FirebaseFirestore.instance
         .collection('appointments')
         .where('patientId', isEqualTo: uid)
-        .where('status', whereIn: ['Accepted', 'Completed', 'Pending'])
+        .where('status', isEqualTo: 'Accepted')
         .get();
 
     final doctors = MriReportService.doctorsFromAppointments(appointmentSnap.docs);
@@ -71,7 +71,7 @@ class _ReportsPageState extends State<ReportsPage> {
     if (doctors.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No active appointments found. Book an appointment before sharing a report.'),
+          content: Text('Share is available after your doctor accepts the appointment.'),
         ),
       );
       return;
@@ -249,7 +249,14 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
       body: uid == null
           ? const Center(child: Text('Sign in to see your reports'))
-          : Stack(
+          : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: MriReportService.appointmentDoctorsStream(uid),
+              builder: (context, apptSnap) {
+                final canShare = MriReportService
+                    .doctorsFromAppointments(apptSnap.data?.docs ?? [])
+                    .isNotEmpty;
+
+                return Stack(
               children: [
                 StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                   stream: MriReportService.patientLibraryReportsStream(uid),
@@ -302,11 +309,14 @@ class _ReportsPageState extends State<ReportsPage> {
                                     ? null
                                     : () => _confirmDeleteReport(doc.id, title),
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.share_outlined, color: kPrimaryColor),
-                                tooltip: 'Share with doctor',
-                                onPressed: _isSharing ? null : () => _showShareDialog(doc.id, data, title),
-                              ),
+                              if (canShare)
+                                IconButton(
+                                  icon: const Icon(Icons.share_outlined, color: kPrimaryColor),
+                                  tooltip: 'Share with doctor',
+                                  onPressed: _isSharing
+                                      ? null
+                                      : () => _showShareDialog(doc.id, data, title),
+                                ),
                               if (pdfUrl.isNotEmpty)
                                 IconButton(
                                   icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
@@ -327,6 +337,8 @@ class _ReportsPageState extends State<ReportsPage> {
                     child: const Center(child: CircularProgressIndicator()),
                   ),
               ],
+            );
+              },
             ),
     );
   }

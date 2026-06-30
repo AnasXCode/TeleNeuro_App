@@ -559,60 +559,117 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
     }
   }
 
-  Widget _buildDoctorSelector() {
+  Widget _buildShareWithDoctorSection() {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.orange.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.orange.shade200),
-        ),
-        child: const Text(
-          'Sign in to share this report with your doctor.',
-          style: TextStyle(color: kTextDark, fontSize: 13),
-        ),
-      );
-    }
+    if (user == null) return const SizedBox.shrink();
 
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: MriReportService.appointmentDoctorsStream(user.uid),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: Padding(
-            padding: EdgeInsets.all(8),
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ));
+          return const SizedBox.shrink();
         }
 
         final doctors = MriReportService.doctorsFromAppointments(snapshot.data?.docs ?? []);
+        if (doctors.isEmpty) return const SizedBox.shrink();
 
-        if (doctors.isEmpty) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.shade200),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Share with doctor',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: kTextDark,
+                ),
+              ),
             ),
-            child: const Text(
-              'No active appointments found. Book an appointment first to share this report with a doctor.',
-              style: TextStyle(color: kTextDark, fontSize: 13),
+            const SizedBox(height: 8),
+            _buildDoctorSelector(doctors),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildShareReportButton() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: MriReportService.appointmentDoctorsStream(user.uid),
+      builder: (context, snapshot) {
+        final doctors = MriReportService.doctorsFromAppointments(snapshot.data?.docs ?? []);
+        if (doctors.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          children: [
+            const SizedBox(height: 15),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (_selectedDoctorId == null || _selectedDoctorId!.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please select a doctor before sharing the report.'),
+                      ),
+                    );
+                    return;
+                  }
+                  final doctorLabel = _selectedDoctorName ?? 'Doctor';
+                  await Share.shareXFiles(
+                    [XFile(_pdfFilePath!)],
+                    text:
+                        'Hello Dr. $doctorLabel, please find my TeleNeuro MRI Diagnostic Report attached for our consultation.',
+                  );
+                },
+                icon: const Icon(Icons.share, color: Colors.white),
+                label: const Text(
+                  "Share Report to Doctor",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 5,
+                ),
+              ),
             ),
-          );
-        }
+          ],
+        );
+      },
+    );
+  }
 
-        final entries = doctors.entries.toList()
-          ..sort((a, b) => a.value.compareTo(b.value));
+  Widget _buildDoctorSelector(Map<String, String> doctors) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return const SizedBox.shrink();
+    }
 
-        final selectedId = _selectedDoctorId != null && doctors.containsKey(_selectedDoctorId)
-            ? _selectedDoctorId
-            : null;
+    if (doctors.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-        return Container(
+    final entries = doctors.entries.toList()
+      ..sort((a, b) => a.value.compareTo(b.value));
+
+    final selectedId = _selectedDoctorId != null && doctors.containsKey(_selectedDoctorId)
+        ? _selectedDoctorId
+        : null;
+
+    return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           decoration: BoxDecoration(
@@ -646,8 +703,6 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
             ),
           ),
         );
-      },
-    );
   }
 
   @override
@@ -857,19 +912,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
 
                   const SizedBox(height: 20),
 
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Share with doctor',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: kTextDark,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _buildDoctorSelector(),
+                  _buildShareWithDoctorSection(),
 
                   const SizedBox(height: 20),
 
@@ -901,45 +944,7 @@ class _MRIUploadPageState extends State<MRIUploadPage> {
                   ),
 
                   if (_pdfFilePath != null) ...[
-                    const SizedBox(height: 15),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          if (_selectedDoctorId == null || _selectedDoctorId!.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please select a doctor before sharing the report.'),
-                              ),
-                            );
-                            return;
-                          }
-                          final doctorLabel = _selectedDoctorName ?? 'Doctor';
-                          await Share.shareXFiles(
-                            [XFile(_pdfFilePath!)],
-                            text:
-                            'Hello Dr. $doctorLabel, please find my TeleNeuro MRI Diagnostic Report attached for our consultation.',
-                          );
-                        },
-                        icon: const Icon(Icons.share, color: Colors.white),
-                        label: const Text(
-                          "Share Report to Doctor",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 5,
-                        ),
-                      ),
-                    ),
+                    _buildShareReportButton(),
                   ],
                 ],
               ),

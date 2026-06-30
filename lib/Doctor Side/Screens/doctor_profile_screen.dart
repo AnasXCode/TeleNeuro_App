@@ -27,7 +27,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   String _name = "Loading...";
   String _email = "";
   String _experience = "0 Years";
-  String _rating = "Loading..."; 
+  String _rating = "Loading...";
   String _hospital = "Not Set";
   String _phone = "Not Set";
   String _specialization = "—";
@@ -35,7 +35,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   String _about = "—";
   String _dob = "—";
   String? _photoUrl;
-  
+
   bool _loading = true;
 
   final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -49,7 +49,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   Future<void> _fetchDoctorData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
       if (!mounted) return;
 
@@ -61,10 +64,15 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
           _experience = data['experience'] ?? "0 Years";
           _hospital = data['hospital'] ?? "Not Set";
           _phone = data['phone'] ?? "Not Set";
-          _specialization = data['speciality'] ?? data['specialization'] ?? "General Physician";
+          _specialization =
+              data['speciality'] ??
+              data['specialization'] ??
+              "General Physician";
           _qualifications = data['qualifications'] ?? data['education'] ?? "—";
           _about = data['about'] ?? "—";
-          _dob = data['dob']?.toString().trim().isNotEmpty == true ? data['dob'].toString() : "—";
+          _dob = data['dob']?.toString().trim().isNotEmpty == true
+              ? data['dob'].toString()
+              : "—";
           _photoUrl = (data['photoUrl'] as String?)?.trim();
           if (_photoUrl != null && _photoUrl!.isEmpty) _photoUrl = null;
 
@@ -98,18 +106,23 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         ),
         content: const Text("Are you sure you want to sign out?"),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("Cancel")),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () async {
               final nav = Navigator.of(context);
               await FirebaseAuth.instance.signOut();
               nav.pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const DoctorLoginScreen()),
-                  (route) => false
+                MaterialPageRoute(builder: (_) => const DoctorLoginScreen()),
+                (route) => false,
               );
             },
             child: const Text("Logout", style: TextStyle(color: Colors.white)),
@@ -196,7 +209,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                       const SizedBox(height: 4),
                       Text(
                         _specialization,
-                        style: const TextStyle(color: Colors.white70, fontSize: 15),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 15,
+                        ),
                       ),
                     ],
                   ),
@@ -213,16 +229,31 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Professional Information Section
-                  _sectionHeader(Icons.work_outline, "Professional Information"),
+                  _sectionHeader(
+                    Icons.work_outline,
+                    "Professional Information",
+                  ),
                   const SizedBox(height: 12),
                   _infoCard([
                     _infoRow(Icons.email_outlined, "Email", _email),
                     _divider(),
-                    _infoRow(Icons.calendar_today_outlined, "Date of Birth", _dob),
+                    _infoRow(
+                      Icons.calendar_today_outlined,
+                      "Date of Birth",
+                      _dob,
+                    ),
                     _divider(),
-                    _infoRow(Icons.medical_services_outlined, "Specialization", _specialization),
+                    _infoRow(
+                      Icons.medical_services_outlined,
+                      "Specialization",
+                      _specialization,
+                    ),
                     _divider(),
-                    _infoRow(Icons.school_outlined, "Qualifications", _qualifications),
+                    _infoRow(
+                      Icons.school_outlined,
+                      "Qualifications",
+                      _qualifications,
+                    ),
                     _divider(),
                     _infoRow(Icons.star_outline, "Rating", _rating),
                   ]),
@@ -230,12 +261,19 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   const SizedBox(height: 24),
 
                   // Work Information Section
-                  _sectionHeader(Icons.local_hospital_outlined, "Work Information"),
+                  _sectionHeader(
+                    Icons.local_hospital_outlined,
+                    "Work Information",
+                  ),
                   const SizedBox(height: 12),
                   _infoCard([
                     _infoRow(Icons.business_outlined, "Hospital", _hospital),
                     _divider(),
-                    _infoRow(Icons.access_time_outlined, "Experience", _experience),
+                    _infoRow(
+                      Icons.access_time_outlined,
+                      "Experience",
+                      _experience,
+                    ),
                     _divider(),
                     _infoRow(Icons.info_outline, "About", _about),
                   ]),
@@ -243,7 +281,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   const SizedBox(height: 24),
 
                   // Contact Information Section
-                  _sectionHeader(Icons.contact_phone_outlined, "Contact Information"),
+                  _sectionHeader(
+                    Icons.contact_phone_outlined,
+                    "Contact Information",
+                  ),
                   const SizedBox(height: 12),
                   _infoCard([
                     _infoRow(Icons.phone_android_outlined, "Phone", _phone),
@@ -266,7 +307,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const DoctorEditProfilePage()),
+                        MaterialPageRoute(
+                          builder: (_) => const DoctorEditProfilePage(),
+                        ),
                       ).then((_) => _fetchDoctorData());
                     },
                   ),
@@ -397,7 +440,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         ),
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: color.withValues(alpha: 0.4)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           backgroundColor: color.withValues(alpha: 0.04),
         ),
       ),
@@ -424,7 +469,12 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: Colors.grey.shade300),
             ),
-            child: const Center(child: Text("No reviews yet.", style: TextStyle(color: Colors.grey))),
+            child: const Center(
+              child: Text(
+                "No reviews yet.",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
           );
         }
 
@@ -445,7 +495,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
               margin: const EdgeInsets.only(bottom: 10),
               color: Colors.white,
               elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(14.0),
                 child: Column(
@@ -454,11 +506,27 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(patientName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        Text(
+                          patientName,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
                         Row(
                           children: [
-                            Text(stars.toString(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amber)),
-                            const Icon(Icons.star, color: Colors.amber, size: 16),
+                            Text(
+                              stars.toString(),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 16,
+                            ),
                           ],
                         ),
                       ],
@@ -466,7 +534,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                     const SizedBox(height: 6),
                     Text(
                       feedback.isEmpty ? "No comment provided." : '"$feedback"',
-                      style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.black87, fontSize: 13),
+                      style: const TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Colors.black87,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -510,21 +582,34 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
   Future<void> _loadData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (doc.exists) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         setState(() {
           _email = data['email'] ?? "";
           _specialization = data['speciality'] ?? data['specialization'] ?? "";
           _qualifications = data['qualifications'] ?? data['education'] ?? "";
-          
-          phoneC.text = (data['phone'] == 'Not Set' || data['phone'] == null) ? "" : data['phone'];
-          hospitalC.text = (data['hospital'] == 'Not Set' || data['hospital'] == null) ? "" : data['hospital'];
-          
+
+          phoneC.text = (data['phone'] == 'Not Set' || data['phone'] == null)
+              ? ""
+              : data['phone'];
+          hospitalC.text =
+              (data['hospital'] == 'Not Set' || data['hospital'] == null)
+              ? ""
+              : data['hospital'];
+
           String expStr = data['experience'] ?? "";
-          experienceC.text = expStr.replaceAll(RegExp(r'[^0-9]'), ''); // Extract just the numbers
-          
-          aboutC.text = (data['about'] == '—' || data['about'] == null) ? "" : data['about'];
+          experienceC.text = expStr.replaceAll(
+            RegExp(r'[^0-9]'),
+            '',
+          ); // Extract just the numbers
+
+          aboutC.text = (data['about'] == '—' || data['about'] == null)
+              ? ""
+              : data['about'];
           _photoUrl = data['photoUrl'];
         });
       }
@@ -559,7 +644,10 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Profile Updated Successfully"), backgroundColor: Colors.green),
+      const SnackBar(
+        content: Text("Profile Updated Successfully"),
+        backgroundColor: Colors.green,
+      ),
     );
   }
 
@@ -580,7 +668,9 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
           Center(
             child: GestureDetector(
               onTap: () async {
-                final XFile? i = await _picker.pickImage(source: ImageSource.gallery);
+                final XFile? i = await _picker.pickImage(
+                  source: ImageSource.gallery,
+                );
                 if (i != null) setState(() => _profileImage = File(i.path));
               },
               child: Stack(
@@ -608,7 +698,11 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
-                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                 ],
@@ -617,14 +711,17 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
           ),
           const SizedBox(height: 6),
           const Center(
-            child: Text("Tap to change photo", style: TextStyle(color: kTextLight, fontSize: 12)),
+            child: Text(
+              "Tap to change photo",
+              style: TextStyle(color: kTextLight, fontSize: 12),
+            ),
           ),
           const SizedBox(height: 28),
 
           // --- Editable Fields ---
           _buildEditField("Phone Number", phoneC, Icons.phone_android_outlined),
           _buildEditField("Hospital", hospitalC, Icons.local_hospital_outlined),
-          
+
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: TextField(
@@ -633,7 +730,11 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
               decoration: InputDecoration(
                 labelText: "Years of Experience",
                 labelStyle: const TextStyle(color: kTextLight),
-                prefixIcon: const Icon(Icons.work_outline, color: kPrimaryColor, size: 20),
+                prefixIcon: const Icon(
+                  Icons.work_outline,
+                  color: kPrimaryColor,
+                  size: 20,
+                ),
                 suffixText: "Years",
                 filled: true,
                 fillColor: Colors.white,
@@ -649,22 +750,36 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
                   borderRadius: BorderRadius.circular(10),
                   borderSide: const BorderSide(color: kPrimaryColor, width: 2),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 16,
+                ),
               ),
             ),
           ),
-          
+
           _buildEditField("About", aboutC, Icons.info_outline, maxLines: 3),
 
           const SizedBox(height: 16),
 
-          const Text("Non-Editable Information", style: TextStyle(fontWeight: FontWeight.bold, color: kTextDark)),
+          const Text(
+            "Non-Editable Information",
+            style: TextStyle(fontWeight: FontWeight.bold, color: kTextDark),
+          ),
           const SizedBox(height: 12),
 
           // --- Read-Only Fields ---
           _buildReadOnlyField("Email Address", _email, Icons.email_outlined),
-          _buildReadOnlyField("Specialization", _specialization, Icons.medical_services_outlined),
-          _buildReadOnlyField("Qualifications", _qualifications, Icons.school_outlined),
+          _buildReadOnlyField(
+            "Specialization",
+            _specialization,
+            Icons.medical_services_outlined,
+          ),
+          _buildReadOnlyField(
+            "Qualifications",
+            _qualifications,
+            Icons.school_outlined,
+          ),
 
           const SizedBox(height: 28),
 
@@ -676,11 +791,17 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
               icon: const Icon(Icons.check_circle_outline, color: Colors.white),
               label: const Text(
                 "Save Changes",
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimaryColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 2,
               ),
             ),
@@ -691,7 +812,12 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
     );
   }
 
-  Widget _buildEditField(String label, TextEditingController controller, IconData icon, {int maxLines = 1}) {
+  Widget _buildEditField(
+    String label,
+    TextEditingController controller,
+    IconData icon, {
+    int maxLines = 1,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextField(
@@ -715,7 +841,10 @@ class _DoctorEditProfilePageState extends State<DoctorEditProfilePage> {
             borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: kPrimaryColor, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 14,
+            horizontal: 16,
+          ),
         ),
       ),
     );
