@@ -63,12 +63,12 @@ Patients can upload an MRI scan, receive an instant AI-generated diagnosis repor
 
 | Patient Dashboard | MRI Reports | Appointments |
 |:---:|:---:|:---:|
-| ![Patient Dashboard]<img width="720" height="1600" alt="patient_dashboard png" src="https://github.com/user-attachments/assets/e080490f-6c75-419e-91db-5a8c7b3b6280" />  |![Lab Report]<img width="720" height="1600" alt="Reports" src="https://github.com/user-attachments/assets/d52293f2-6f84-4055-96b2-4eda3eb73b47" /> |![Appointments]<img width="720" height="1600" alt="Appointments" src="https://github.com/user-attachments/assets/976fe406-76fa-4b53-bb63-7a609427aa40" />
+<img width="720" height="1600" alt="patient_dashboard png" src="https://github.com/user-attachments/assets/e080490f-6c75-419e-91db-5a8c7b3b6280" /> <img width="720" height="1600" alt="Reports" src="https://github.com/user-attachments/assets/d52293f2-6f84-4055-96b2-4eda3eb73b47" /><img width="720" height="1600" alt="Appointments" src="https://github.com/user-attachments/assets/976fe406-76fa-4b53-bb63-7a609427aa40" />
 
 
 | Doctor Dashboard | Doctor Profile | User Guide |
 |:---:|:---:|:---:|
-| ![Doctor Dashboard]<img width="720" height="1600" alt="doctor_dashboard png" src="https://github.com/user-attachments/assets/e186770d-218d-4e5b-bc04-e49d1aa5920b" />| ![Doctor Profile]<img width="720" height="1600" alt="doctor profile" src="https://github.com/user-attachments/assets/8404a1ed-0edf-4494-92da-3cf95df4dcba" />| ![User Guide]<img width="720" height="1600" alt="user guide" src="https://github.com/user-attachments/assets/f7b59a0b-f0b0-4b5f-9f00-ac6fbe145afa" />
+<img width="720" height="1600" alt="doctor_dashboard png" src="https://github.com/user-attachments/assets/e186770d-218d-4e5b-bc04-e49d1aa5920b" /><img width="720" height="1600" alt="doctor profile" src="https://github.com/user-attachments/assets/8404a1ed-0edf-4494-92da-3cf95df4dcba" /><img width="720" height="1600" alt="user guide" src="https://github.com/user-attachments/assets/f7b59a0b-f0b0-4b5f-9f00-ac6fbe145afa" />
 
 
 ---
