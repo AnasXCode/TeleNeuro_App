@@ -61,14 +61,14 @@ Patients can upload an MRI scan, receive an instant AI-generated diagnosis repor
 
 <!-- Replace the paths below with your actual screenshot files, e.g. docs/screenshots/xyz.png -->
 
-| Splash / Onboarding | Profile Selection | Patient Dashboard |
+| Patient Dashboard | MRI Reports | Appointments |
 |:---:|:---:|:---:|
-| ![Splash]<img width="720" height="1600" alt="splash png" src="https://github.com/user-attachments/assets/0d7ff207-3189-4eca-9c98-3282e4cb90aa" /> | ![Profile Selection]<img width="720" height="1600" alt="profile_selection png" src="https://github.com/user-attachments/assets/74ed80eb-a2ac-45f5-9b30-495bd1e8bd7a" /> | ![Patient Dashboard]<img width="720" height="1600" alt="patient_dashboard png" src="https://github.com/user-attachments/assets/e080490f-6c75-419e-91db-5a8c7b3b6280" />|![MRI Upload]<img width="720" height="1600" alt="mri_upload png" src="https://github.com/user-attachments/assets/a2d9e209-c06e-42bc-a214-97cde5cd60fa" /> |![Report]<img width="720" height="1600" alt="Report" src="https://github.com/user-attachments/assets/6bc8985b-efb2-4694-83e9-9f51a1873713" /> |![Lab Report]<img width="720" height="1600" alt="Reports" src="https://github.com/user-attachments/assets/d52293f2-6f84-4055-96b2-4eda3eb73b47" />|![Appointments]<img width="720" height="1600" alt="Appointments" src="https://github.com/user-attachments/assets/976fe406-76fa-4b53-bb63-7a609427aa40" />|![Specialists]<img width="720" height="1600" alt="Specialists" src="https://github.com/user-attachments/assets/acefffa9-8082-4d79-8cd7-91a7975c0085" />|![Notifications]<img width="720" height="1600" alt="Notifications" src="https://github.com/user-attachments/assets/fce4bfde-1ec5-48a9-b783-b2df97f8e858" />
+| ![Patient Dashboard]<img width="720" height="1600" alt="patient_dashboard png" src="https://github.com/user-attachments/assets/e080490f-6c75-419e-91db-5a8c7b3b6280" />  |![Lab Report]<img width="720" height="1600" alt="Reports" src="https://github.com/user-attachments/assets/d52293f2-6f84-4055-96b2-4eda3eb73b47" /> |![Appointments]<img width="720" height="1600" alt="Appointments" src="https://github.com/user-attachments/assets/976fe406-76fa-4b53-bb63-7a609427aa40" />
 
 
-| Doctor Dashboard | AI MRI Diagnosis | Chat | asbdbsa  |
+| Doctor Dashboard | Doctor Profile | User Guide |
 |:---:|:---:|:---:|
-| ![Doctor Dashboard]<img width="720" height="1600" alt="doctor_dashboard png" src="https://github.com/user-attachments/assets/e186770d-218d-4e5b-bc04-e49d1aa5920b" />| ![Chat]<img width="720" height="1600" alt="chat png" src="https://github.com/user-attachments/assets/595c4510-31fc-4be5-862e-88d8eb959f15" />| ![Doctor Profile]<img width="720" height="1600" alt="doctor profile" src="https://github.com/user-attachments/assets/8404a1ed-0edf-4494-92da-3cf95df4dcba" />| ![User Guide]<img width="720" height="1600" alt="user guide" src="https://github.com/user-attachments/assets/f7b59a0b-f0b0-4b5f-9f00-ac6fbe145afa" />
+| ![Doctor Dashboard]<img width="720" height="1600" alt="doctor_dashboard png" src="https://github.com/user-attachments/assets/e186770d-218d-4e5b-bc04-e49d1aa5920b" />| ![Doctor Profile]<img width="720" height="1600" alt="doctor profile" src="https://github.com/user-attachments/assets/8404a1ed-0edf-4494-92da-3cf95df4dcba" />| ![User Guide]<img width="720" height="1600" alt="user guide" src="https://github.com/user-attachments/assets/f7b59a0b-f0b0-4b5f-9f00-ac6fbe145afa" />
 
 
 ---
