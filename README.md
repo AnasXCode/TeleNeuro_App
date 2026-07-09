@@ -106,26 +106,30 @@ The full training/export notebook is documented in `final-fyp.ipynb`.
 ---
 
 ## 📂 Project Structure
+
+```
 lib/
-├── Splash/                     # Onboarding / splash screens
-├── Profile Side/                # Role selection (Patient / Doctor)
+├── Splash/                       # Onboarding / splash screens
+├── Profile Side/                 # Role selection (Patient / Doctor)
 ├── Patient Side/
-│   ├── Auth/                    # Patient login, signup, portal
-│   ├── Screens/                 # Dashboard, appointments, chat, MRI upload, reports...
-│   └── services/                # MRI report service
+│   ├── Auth/                     # Patient login, signup, portal
+│   ├── Screens/                  # Dashboard, appointments, chat, MRI upload, reports...
+│   └── services/                 # MRI report service
 ├── Doctor Side/
-│   ├── Auth/                    # Doctor login, signup, portal
-│   ├── Screens/                 # Dashboard, appointments, chat, patients, reports...
-│   └── Widgets/                 # Doctor-specific cards
+│   ├── Auth/                     # Doctor login, signup, portal
+│   ├── Screens/                  # Dashboard, appointments, chat, patients, reports...
+│   └── Widgets/                  # Doctor-specific cards
 ├── Widgets/                      # Shared reusable widgets (avatars, dropdowns, pickers...)
 ├── services/                     # Shared services (auth, notifications, validation...)
 ├── data/                         # Static option lists (specializations, qualifications)
 ├── firebase_options.dart
 ├── supabase_config.dart
 └── main.dart
+
 assets/
 ├── screen1.png ... screen4.jpg   # Onboarding illustrations
 └── vit_fyp_direct.tflite         # AI model (NOT committed — see setup below)
+```
 
 ---
 
