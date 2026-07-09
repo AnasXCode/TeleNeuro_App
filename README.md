@@ -63,12 +63,12 @@ Patients can upload an MRI scan, receive an instant AI-generated diagnosis repor
 
 | Splash / Onboarding | Profile Selection | Patient Dashboard |
 |:---:|:---:|:---:|
-| ![Splash]<img width="720" height="1600" alt="splash png" src="https://github.com/user-attachments/assets/0d7ff207-3189-4eca-9c98-3282e4cb90aa" /> | ![Profile Selection]<img width="720" height="1600" alt="profile_selection png" src="https://github.com/user-attachments/assets/74ed80eb-a2ac-45f5-9b30-495bd1e8bd7a" /> | ![Patient Dashboard]<img width="720" height="1600" alt="patient_dashboard png" src="https://github.com/user-attachments/assets/e080490f-6c75-419e-91db-5a8c7b3b6280" />|![MRI Upload]<img width="720" height="1600" alt="mri_upload png" src="https://github.com/user-attachments/assets/a2d9e209-c06e-42bc-a214-97cde5cd60fa" /> |![Report]<img width="720" height="1600" alt="Report" src="https://github.com/user-attachments/assets/6bc8985b-efb2-4694-83e9-9f51a1873713" /> 
+| ![Splash]<img width="720" height="1600" alt="splash png" src="https://github.com/user-attachments/assets/0d7ff207-3189-4eca-9c98-3282e4cb90aa" /> | ![Profile Selection]<img width="720" height="1600" alt="profile_selection png" src="https://github.com/user-attachments/assets/74ed80eb-a2ac-45f5-9b30-495bd1e8bd7a" /> | ![Patient Dashboard]<img width="720" height="1600" alt="patient_dashboard png" src="https://github.com/user-attachments/assets/e080490f-6c75-419e-91db-5a8c7b3b6280" />|![MRI Upload]<img width="720" height="1600" alt="mri_upload png" src="https://github.com/user-attachments/assets/a2d9e209-c06e-42bc-a214-97cde5cd60fa" /> |![Report]<img width="720" height="1600" alt="Report" src="https://github.com/user-attachments/assets/6bc8985b-efb2-4694-83e9-9f51a1873713" /> |![Lab Report]<img width="720" height="1600" alt="Reports" src="https://github.com/user-attachments/assets/d52293f2-6f84-4055-96b2-4eda3eb73b47" />|![Appointments]<img width="720" height="1600" alt="Appointments" src="https://github.com/user-attachments/assets/976fe406-76fa-4b53-bb63-7a609427aa40" />|![Specialists]<img width="720" height="1600" alt="Specialists" src="https://github.com/user-attachments/assets/acefffa9-8082-4d79-8cd7-91a7975c0085" />|![Notifications]<img width="720" height="1600" alt="Notifications" src="https://github.com/user-attachments/assets/fce4bfde-1ec5-48a9-b783-b2df97f8e858" />
 
 
 | Doctor Dashboard | AI MRI Diagnosis | Chat |
 |:---:|:---:|:---:|
-| ![Doctor Dashboard]<img width="720" height="1600" alt="doctor_dashboard png" src="https://github.com/user-attachments/assets/e186770d-218d-4e5b-bc04-e49d1aa5920b" />| ![Chat]<img width="720" height="1600" alt="chat png" src="https://github.com/user-attachments/assets/595c4510-31fc-4be5-862e-88d8eb959f15" /> |
+| ![Doctor Dashboard]<img width="720" height="1600" alt="doctor_dashboard png" src="https://github.com/user-attachments/assets/e186770d-218d-4e5b-bc04-e49d1aa5920b" />| ![Chat]<img width="720" height="1600" alt="chat png" src="https://github.com/user-attachments/assets/595c4510-31fc-4be5-862e-88d8eb959f15" />| ![Doctor Profile]<img width="720" height="1600" alt="doctor profile" src="https://github.com/user-attachments/assets/8404a1ed-0edf-4494-92da-3cf95df4dcba" />| ![User Guide]<img width="720" height="1600" alt="user guide" src="https://github.com/user-attachments/assets/f7b59a0b-f0b0-4b5f-9f00-ac6fbe145afa" />
 
 
 ---
@@ -172,7 +172,7 @@ flutter pub get
 The `.tflite` model file is **too large for a normal Git push** (GitHub blocks files over 100MB), so it is hosted separately instead of being committed to this repository.
 
 **Steps to set it up:**
-1. Download the model file from: **[sha256:c7f12a1edc4c103675da4a2a9f02b2077889e1a0c0aad9c5ebe932ddaf021c02]** *(GitHub Release)*
+1. Download the model file from:*(GitHub Release)*
 2. Place the downloaded file at:
 assets/vit_fyp_direct.tflite
 3. Confirm it's registered in `pubspec.yaml` (already included in this repo):
