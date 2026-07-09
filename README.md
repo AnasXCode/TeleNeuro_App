@@ -172,7 +172,7 @@ flutter pub get
 The `.tflite` model file is **too large for a normal Git push** (GitHub blocks files over 100MB), so it is hosted separately instead of being committed to this repository.
 
 **Steps to set it up:**
-1. Download the model file from: **[YOUR_DOWNLOAD_LINK_HERE]** *(GitHub Release / Google Drive / Hugging Face — replace with your actual link)*
+1. Download the model file from: **[sha256:c7f12a1edc4c103675da4a2a9f02b2077889e1a0c0aad9c5ebe932ddaf021c02]** *(GitHub Release)*
 2. Place the downloaded file at:
 assets/vit_fyp_direct.tflite
 3. Confirm it's registered in `pubspec.yaml` (already included in this repo):
