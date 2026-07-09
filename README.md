@@ -214,7 +214,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 **Malik Anas Ahmed**
 📧 anasahmed.appdev@gmail.com
-🔗 [LinkedIn](www.linkedin.com/in/malikanasahmed) 
+🔗 [LinkedIn](https://www.linkedin.com/in/malikanasahmed)
 
 ---
 
