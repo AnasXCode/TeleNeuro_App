@@ -173,7 +173,16 @@ class _BirthDatePickerSheetState extends State<_BirthDatePickerSheet> {
                     ),
                     onPressed: () {
                       final date = _selectedDate;
-                      if (!BirthDateUtils.isValidBirthDate(date)) return;
+                      final error = BirthDateUtils.validateForSignup(date);
+                      if (error != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(error),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
                       Navigator.pop(context, date);
                     },
                     child: const Text('Done', style: TextStyle(color: Colors.white)),

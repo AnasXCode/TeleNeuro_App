@@ -24,6 +24,7 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
   // Real-time validation state
   String _emailError = '';
   String _usernameError = '';
+  String _dobError = '';
   String _password = '';
 
   // Controllers
@@ -63,6 +64,12 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
     });
   }
 
+  void _validateDobRealTime(DateTime? date) {
+    setState(() {
+      _dobError = BirthDateUtils.validateForSignup(date) ?? '';
+    });
+  }
+
   @override
   void dispose() {
     _nameController.removeListener(_validateUsernameRealTime);
@@ -98,9 +105,11 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
       return;
     }
 
-    if (!BirthDateUtils.isValidBirthDate(dobDate)) {
+    final dobValidationError = BirthDateUtils.validateForSignup(dobDate);
+    if (dobValidationError != null) {
+      setState(() => _dobError = dobValidationError);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a valid date of birth'), backgroundColor: Colors.red),
+        SnackBar(content: Text(dobValidationError), backgroundColor: Colors.red),
       );
       return;
     }
@@ -417,10 +426,34 @@ class _DoctorSignupScreenState extends State<DoctorSignupScreen> {
 
                   FadeInAnimation(
                     delay: 7,
-                    child: BirthDatePickerField(
-                      selectedDate: _selectedDob,
-                      accentColor: Colors.blue.shade900,
-                      onDateSelected: (date) => setState(() => _selectedDob = date),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        BirthDatePickerField(
+                          selectedDate: _selectedDob,
+                          accentColor: Colors.blue.shade900,
+                          onDateSelected: (date) {
+                            setState(() => _selectedDob = date);
+                            _validateDobRealTime(date);
+                          },
+                        ),
+                        if (_dobError.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6, left: 12),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.redAccent, size: 16),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _dobError,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
